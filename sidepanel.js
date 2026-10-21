@@ -426,14 +426,492 @@ function quickExpandAndSave(item, count) {
   }
 }
 
+const jsonTreeView = document.getElementById('jsonTreeView');
+const modeTreeBtn = document.getElementById('modeTreeBtn');
+const modeRawBtn = document.getElementById('modeRawBtn');
+const expandAllBtn = document.getElementById('expandAllBtn');
+const collapseAllBtn = document.getElementById('collapseAllBtn');
+const openJsonSearchBtn = document.getElementById('openJsonSearchBtn');
+const jsonSearchBar = document.getElementById('jsonSearchBar');
+const jsonSearchInput = document.getElementById('jsonSearchInput');
+const jsonSearchCount = document.getElementById('jsonSearchCount');
+const jsonSearchPrevBtn = document.getElementById('jsonSearchPrevBtn');
+const jsonSearchNextBtn = document.getElementById('jsonSearchNextBtn');
+const jsonSearchCloseBtn = document.getElementById('jsonSearchCloseBtn');
+
+let currentEditorMode = 'tree'; // 'tree' | 'raw'
+let currentTreeData = null;
+let searchMatches = [];
+let currentMatchIndex = -1;
+
+function setEditorMode(mode) {
+  currentEditorMode = mode;
+  if (mode === 'tree') {
+    modeTreeBtn.classList.add('active');
+    modeRawBtn.classList.remove('active');
+    jsonTreeView.classList.add('active');
+    jsonEditor.classList.remove('active');
+    expandAllBtn.style.display = '';
+    collapseAllBtn.style.display = '';
+    renderJsonTree();
+  } else {
+    modeRawBtn.classList.add('active');
+    modeTreeBtn.classList.remove('active');
+    jsonEditor.classList.add('active');
+    jsonTreeView.classList.remove('active');
+    expandAllBtn.style.display = 'none';
+    collapseAllBtn.style.display = 'none';
+  }
+  if (jsonSearchBar.classList.contains('open') && jsonSearchInput.value.trim()) {
+    performJsonSearch(false);
+  }
+}
+
+if (modeTreeBtn) modeTreeBtn.addEventListener('click', () => setEditorMode('tree'));
+if (modeRawBtn) modeRawBtn.addEventListener('click', () => setEditorMode('raw'));
+
+function setByPath(root, path, newVal) {
+  let curr = root;
+  for (let i = 0; i < path.length - 1; i++) {
+    curr = curr[path[i]];
+  }
+  curr[path[path.length - 1]] = newVal;
+}
+
+function renameKeyAtPath(root, path, newKey) {
+  if (!newKey || path.length === 0) return false;
+  let parent = root;
+  for (let i = 0; i < path.length - 1; i++) {
+    parent = parent[path[i]];
+  }
+  const oldKey = path[path.length - 1];
+  if (oldKey === newKey || typeof parent !== 'object' || Array.isArray(parent)) return false;
+  const entries = Object.entries(parent);
+  Object.keys(parent).forEach((k) => delete parent[k]);
+  entries.forEach(([k, v]) => {
+    parent[k === oldKey ? newKey : k] = v;
+  });
+  path[path.length - 1] = newKey;
+  return true;
+}
+
+function parseEditedPrimitive(rawText, origType) {
+  const trimmed = rawText.trim();
+  if (trimmed === 'null') return null;
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+  if (origType === 'number') {
+    if (trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed);
+    return rawText;
+  }
+  if (origType !== 'string' && trimmed !== '' && !Number.isNaN(Number(trimmed))) {
+    return Number(trimmed);
+  }
+  return rawText;
+}
+
+function buildObjectSummary(val, isArr) {
+  if (isArr) {
+    return `共 ${val.length} 条`;
+  }
+  const keys = Object.keys(val);
+  if (keys.length === 0) return '空对象';
+  const preview = keys.slice(0, 2).map((k) => {
+    const v = val[k];
+    if (v === null) return `${k}: null`;
+    if (typeof v === 'object') return `${k}: ${Array.isArray(v) ? '[...]' : '{...}'}`;
+    if (typeof v === 'string') return `${k}: "${v.slice(0, 10)}"`;
+    return `${k}: ${v}`;
+  });
+  return preview.join(', ') + (keys.length > 2 ? ', ...' : '');
+}
+
+function createTreeNodeDom(keyName, value, path, isLast, depth) {
+  if (value !== null && typeof value === 'object') {
+    const isArr = Array.isArray(value);
+    const openB = isArr ? '[' : '{';
+    const closeB = isArr ? ']' : '}';
+    const entries = isArr ? value.map((v, i) => [i, v]) : Object.entries(value);
+
+    const nodeEl = document.createElement('div');
+    nodeEl.className = 'jt-node';
+    nodeEl.setAttribute('data-depth', String(depth));
+
+    const lineEl = document.createElement('div');
+    lineEl.className = 'jt-line';
+
+    const toggleEl = document.createElement('span');
+    toggleEl.className = 'jt-toggle';
+    toggleEl.textContent = entries.length > 0 ? '▼' : '';
+    lineEl.appendChild(toggleEl);
+
+    if (keyName !== null) {
+      if (typeof keyName === 'string') {
+        const keyEl = document.createElement('span');
+        keyEl.className = 'jt-key';
+        keyEl.contentEditable = 'true';
+        keyEl.spellcheck = false;
+        keyEl.textContent = keyName;
+        keyEl.title = '点击可修改字段名';
+        keyEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            keyEl.blur();
+          }
+        });
+        keyEl.addEventListener('blur', () => {
+          const nk = keyEl.textContent.trim();
+          if (nk && renameKeyAtPath(currentTreeData, path, nk)) {
+            jsonEditor.value = JSON.stringify(currentTreeData, null, 2);
+          } else {
+            keyEl.textContent = String(path[path.length - 1]);
+          }
+        });
+        lineEl.appendChild(keyEl);
+
+        const colonEl = document.createElement('span');
+        colonEl.className = 'jt-colon';
+        colonEl.textContent = ':';
+        lineEl.appendChild(colonEl);
+      } else {
+        const idxEl = document.createElement('span');
+        idxEl.style.cssText = 'color:#94a3b8;margin-right:6px;font-size:11px;user-select:none;';
+        idxEl.textContent = `#${keyName}`;
+        lineEl.appendChild(idxEl);
+      }
+    }
+
+    const openBracketEl = document.createElement('span');
+    openBracketEl.className = 'jt-bracket';
+    openBracketEl.textContent = openB;
+    lineEl.appendChild(openBracketEl);
+
+    const summaryEl = document.createElement('span');
+    summaryEl.className = 'jt-summary';
+    summaryEl.textContent = buildObjectSummary(value, isArr);
+    lineEl.appendChild(summaryEl);
+
+    const inlineCloseEl = document.createElement('span');
+    inlineCloseEl.className = 'jt-bracket jt-inline-close';
+    inlineCloseEl.textContent = closeB + (isLast ? '' : ',');
+    lineEl.appendChild(inlineCloseEl);
+
+    if (entries.length === 0) {
+      inlineCloseEl.style.display = 'inline';
+    }
+
+    const toggleCollapse = (e) => {
+      e.stopPropagation();
+      if (entries.length === 0) return;
+      const collapsed = nodeEl.classList.toggle('collapsed');
+      toggleEl.textContent = collapsed ? '▶' : '▼';
+      if (collapsed) {
+        summaryEl.textContent = buildObjectSummary(value, isArr);
+      }
+    };
+
+    toggleEl.addEventListener('click', toggleCollapse);
+    summaryEl.addEventListener('click', toggleCollapse);
+
+    nodeEl.appendChild(lineEl);
+
+    if (entries.length > 0) {
+      const childrenEl = document.createElement('div');
+      childrenEl.className = 'jt-children';
+      entries.forEach(([k, v], idx) => {
+        childrenEl.appendChild(createTreeNodeDom(k, v, [...path, k], idx === entries.length - 1, depth + 1));
+      });
+      nodeEl.appendChild(childrenEl);
+
+      const closeLineEl = document.createElement('div');
+      closeLineEl.className = 'jt-line jt-close-line';
+      closeLineEl.innerHTML = `<span style="display:inline-block;width:16px;"></span><span class="jt-bracket">${closeB}</span>${isLast ? '' : '<span class="jt-comma">,</span>'}`;
+      nodeEl.appendChild(closeLineEl);
+    }
+
+    return nodeEl;
+  }
+
+  // 基本类型节点（支持直接点击修改）
+  const lineEl = document.createElement('div');
+  lineEl.className = 'jt-line';
+
+  const spacer = document.createElement('span');
+  spacer.style.cssText = 'display:inline-block;width:16px;';
+  lineEl.appendChild(spacer);
+
+  if (keyName !== null && typeof keyName === 'string') {
+    const keyEl = document.createElement('span');
+    keyEl.className = 'jt-key';
+    keyEl.contentEditable = 'true';
+    keyEl.spellcheck = false;
+    keyEl.textContent = keyName;
+    keyEl.title = '点击可修改字段名';
+    keyEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        keyEl.blur();
+      }
+    });
+    keyEl.addEventListener('blur', () => {
+      const nk = keyEl.textContent.trim();
+      if (nk && renameKeyAtPath(currentTreeData, path, nk)) {
+        jsonEditor.value = JSON.stringify(currentTreeData, null, 2);
+      } else {
+        keyEl.textContent = String(path[path.length - 1]);
+      }
+    });
+    lineEl.appendChild(keyEl);
+
+    const colonEl = document.createElement('span');
+    colonEl.className = 'jt-colon';
+    colonEl.textContent = ':';
+    lineEl.appendChild(colonEl);
+  }
+
+  let currentType = value === null ? 'null' : typeof value;
+  const valEl = document.createElement('span');
+  valEl.className = `jt-val jt-val-${currentType}`;
+  valEl.contentEditable = 'true';
+  valEl.spellcheck = false;
+  valEl.title = '点击直接修改数值';
+  valEl.textContent = value === null ? 'null' : String(value);
+
+  valEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      valEl.blur();
+    }
+  });
+
+  valEl.addEventListener('input', () => {
+    const newVal = parseEditedPrimitive(valEl.textContent, currentType);
+    setByPath(currentTreeData, path, newVal);
+    jsonEditor.value = JSON.stringify(currentTreeData, null, 2);
+    updateArrayInfoLabel();
+  });
+
+  valEl.addEventListener('blur', () => {
+    const newVal = parseEditedPrimitive(valEl.textContent, currentType);
+    currentType = newVal === null ? 'null' : typeof newVal;
+    valEl.className = `jt-val jt-val-${currentType}`;
+    valEl.textContent = newVal === null ? 'null' : String(newVal);
+  });
+
+  lineEl.appendChild(valEl);
+
+  if (!isLast) {
+    const commaEl = document.createElement('span');
+    commaEl.className = 'jt-comma';
+    commaEl.textContent = ',';
+    lineEl.appendChild(commaEl);
+  }
+
+  return lineEl;
+}
+
+function renderJsonTree() {
+  if (!jsonTreeView) return;
+  try {
+    currentTreeData = JSON.parse(jsonEditor.value);
+    jsonTreeView.innerHTML = '';
+    const dom = createTreeNodeDom(null, currentTreeData, [], true, 0);
+    jsonTreeView.appendChild(dom);
+    if (jsonSearchBar.classList.contains('open') && jsonSearchInput.value.trim()) {
+      performJsonSearch(false);
+    }
+  } catch (e) {
+    jsonTreeView.innerHTML = `<div style="color:#dc2626;padding:12px;font-size:12px;">当前内容不是有效 JSON，请切换到「JSON 源码」检查语法：<br/>${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function syncEditorAndTree(newJsonStr) {
+  jsonEditor.value = newJsonStr;
+  updateArrayInfoLabel();
+  if (currentEditorMode === 'tree') {
+    renderJsonTree();
+  }
+}
+
+if (expandAllBtn) {
+  expandAllBtn.addEventListener('click', () => {
+    jsonTreeView.querySelectorAll('.jt-node.collapsed').forEach((n) => {
+      n.classList.remove('collapsed');
+      const t = n.querySelector(':scope > .jt-line > .jt-toggle');
+      if (t) t.textContent = '▼';
+    });
+  });
+}
+
+if (collapseAllBtn) {
+  collapseAllBtn.addEventListener('click', () => {
+    const nodes = Array.from(jsonTreeView.querySelectorAll('.jt-node')).filter(
+      (n) => Number(n.getAttribute('data-depth') || 0) >= 1
+    );
+    const allCollapsed = nodes.length > 0 && nodes.every((n) => n.classList.contains('collapsed'));
+    nodes.forEach((n) => {
+      const depth = Number(n.getAttribute('data-depth') || 0);
+      if (allCollapsed ? depth >= 2 : depth >= 1) {
+        n.classList.add('collapsed');
+        const t = n.querySelector(':scope > .jt-line > .jt-toggle');
+        if (t && t.textContent) t.textContent = '▶';
+      } else {
+        n.classList.remove('collapsed');
+        const t = n.querySelector(':scope > .jt-line > .jt-toggle');
+        if (t && t.textContent) t.textContent = '▼';
+      }
+    });
+  });
+}
+
+// ================= Ctrl+F JSON 内置搜索 =================
+function openSearchBar() {
+  jsonSearchBar.classList.add('open');
+  jsonSearchInput.focus();
+  jsonSearchInput.select();
+  if (jsonSearchInput.value.trim()) {
+    performJsonSearch(true);
+  }
+}
+
+function closeSearchBar() {
+  jsonSearchBar.classList.remove('open');
+  clearTreeHighlights();
+  searchMatches = [];
+  currentMatchIndex = -1;
+  jsonSearchCount.textContent = '0/0';
+}
+
+function clearTreeHighlights() {
+  if (!jsonTreeView) return;
+  jsonTreeView.querySelectorAll('.jt-hit, .jt-hit-active').forEach((el) => {
+    el.classList.remove('jt-hit', 'jt-hit-active');
+  });
+}
+
+function performJsonSearch(scrollToMatch = true) {
+  const kw = jsonSearchInput.value.trim().toLowerCase();
+  clearTreeHighlights();
+  searchMatches = [];
+  currentMatchIndex = -1;
+
+  if (!kw) {
+    jsonSearchCount.textContent = '0/0';
+    return;
+  }
+
+  if (currentEditorMode === 'tree') {
+    const candidates = jsonTreeView.querySelectorAll('.jt-key, .jt-val');
+    candidates.forEach((el) => {
+      if ((el.textContent || '').toLowerCase().includes(kw)) {
+        el.classList.add('jt-hit');
+        searchMatches.push(el);
+        // 自动展开包含命中项的所有父级折叠节点
+        let parent = el.parentElement;
+        while (parent && parent !== jsonTreeView) {
+          if (parent.classList.contains('jt-node') && parent.classList.contains('collapsed')) {
+            parent.classList.remove('collapsed');
+            const t = parent.querySelector(':scope > .jt-line > .jt-toggle');
+            if (t && t.textContent) t.textContent = '▼';
+          }
+          parent = parent.parentElement;
+        }
+      }
+    });
+
+    if (searchMatches.length > 0) {
+      currentMatchIndex = 0;
+      highlightCurrentMatch(scrollToMatch);
+    } else {
+      jsonSearchCount.textContent = '0/0';
+    }
+  } else {
+    const text = jsonEditor.value.toLowerCase();
+    let pos = 0;
+    while (pos < text.length) {
+      const idx = text.indexOf(kw, pos);
+      if (idx === -1) break;
+      searchMatches.push(idx);
+      pos = idx + kw.length;
+    }
+    if (searchMatches.length > 0) {
+      currentMatchIndex = 0;
+      highlightCurrentMatch(scrollToMatch);
+    } else {
+      jsonSearchCount.textContent = '0/0';
+    }
+  }
+}
+
+function highlightCurrentMatch(scrollToMatch = true) {
+  if (searchMatches.length === 0 || currentMatchIndex < 0) {
+    jsonSearchCount.textContent = '0/0';
+    return;
+  }
+  jsonSearchCount.textContent = `${currentMatchIndex + 1}/${searchMatches.length}`;
+
+  if (currentEditorMode === 'tree') {
+    searchMatches.forEach((el, i) => {
+      el.classList.toggle('jt-hit-active', i === currentMatchIndex);
+    });
+    const targetEl = searchMatches[currentMatchIndex];
+    if (scrollToMatch && targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  } else {
+    const kwLen = jsonSearchInput.value.trim().length;
+    const startIdx = searchMatches[currentMatchIndex];
+    if (scrollToMatch) {
+      const linesBefore = jsonEditor.value.slice(0, startIdx).split('\n').length;
+      jsonEditor.scrollTop = Math.max(0, (linesBefore - 5) * 19);
+    }
+  }
+}
+
+function navigateSearch(step) {
+  if (searchMatches.length === 0) {
+    performJsonSearch(true);
+    return;
+  }
+  currentMatchIndex = (currentMatchIndex + step + searchMatches.length) % searchMatches.length;
+  highlightCurrentMatch(true);
+}
+
+if (openJsonSearchBtn) openJsonSearchBtn.addEventListener('click', openSearchBar);
+if (jsonSearchCloseBtn) jsonSearchCloseBtn.addEventListener('click', closeSearchBar);
+if (jsonSearchPrevBtn) jsonSearchPrevBtn.addEventListener('click', () => navigateSearch(-1));
+if (jsonSearchNextBtn) jsonSearchNextBtn.addEventListener('click', () => navigateSearch(1));
+
+if (jsonSearchInput) {
+  jsonSearchInput.addEventListener('input', () => performJsonSearch(true));
+  jsonSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      navigateSearch(e.shiftKey ? -1 : 1);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSearchBar();
+    }
+  });
+}
+
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+    if (detailView.classList.contains('active')) {
+      e.preventDefault();
+      e.stopPropagation();
+      openSearchBar();
+    }
+  }
+});
+
 function openDetailView(item) {
   selectedReq = item;
   const defaultKey = getDefaultMatchKey(item.url);
   const savedRule = mockRules.find((r) => r.matchKey && item.url.includes(r.matchKey));
 
   matchKeyInput.value = savedRule ? savedRule.matchKey : defaultKey;
-  jsonEditor.value = savedRule ? savedRule.mockBody : (item.responseBody || '');
-  updateArrayInfoLabel();
+  syncEditorAndTree(savedRule ? savedRule.mockBody : (item.responseBody || ''));
 
   listView.classList.remove('active');
   detailView.classList.add('active');
@@ -459,8 +937,7 @@ function handleAddRows(count) {
     }
     const parsed = JSON.parse(sourceText);
     const expanded = expandArraysInJson(parsed, count, selectedReq);
-    jsonEditor.value = JSON.stringify(expanded, null, 2);
-    updateArrayInfoLabel();
+    syncEditorAndTree(JSON.stringify(expanded, null, 2));
     showToast(`已追加 ${count} 条数据，点击下方保存即生效`);
   } catch (e) {
     alert('JSON 格式有误，请先检查语法：' + e.message);
@@ -473,8 +950,7 @@ if (emptyDataBtn) {
     try {
       const parsed = JSON.parse(jsonEditor.value);
       const emptied = emptyArraysInJson(parsed);
-      jsonEditor.value = JSON.stringify(emptied, null, 2);
-      updateArrayInfoLabel();
+      syncEditorAndTree(JSON.stringify(emptied, null, 2));
       showToast('已将数据置空，点击下方保存即生效');
     } catch (e) {
       alert('JSON 格式有误，请先检查语法：' + e.message);
@@ -535,11 +1011,12 @@ restoreOrigBtn.addEventListener('click', () => {
   const key = matchKeyInput.value.trim();
   mockRules = mockRules.filter((r) => r.matchKey !== key && !selectedReq.url.includes(r.matchKey));
   if (selectedReq.originalBody) {
-    jsonEditor.value = selectedReq.originalBody;
+    syncEditorAndTree(selectedReq.originalBody);
     selectedReq.responseBody = selectedReq.originalBody;
     selectedReq.mocked = false;
+  } else {
+    updateArrayInfoLabel();
   }
-  updateArrayInfoLabel();
   chrome.storage.local.set({ mockRules }, () => {
     showToast('已恢复原始数据');
     renderList();

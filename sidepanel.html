@@ -507,10 +507,122 @@
 
     .editor-container {
       flex: 1;
-      padding: 10px 14px;
+      padding: 8px 14px 10px;
       display: flex;
       flex-direction: column;
       min-height: 0;
+      gap: 6px;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .mode-switch {
+      display: inline-flex;
+      background: var(--bg-subtle);
+      padding: 2px;
+      border-radius: 6px;
+      gap: 2px;
+    }
+
+    .mode-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-sub);
+      padding: 3px 9px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+
+    .mode-btn.active {
+      background: var(--bg-card);
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .tree-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .mini-action-btn {
+      height: 24px;
+      padding: 0 7px;
+      border: 1px solid var(--border-light);
+      background: var(--bg-card);
+      color: var(--text-sub);
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+
+    .mini-action-btn:hover {
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      border-color: var(--border-hover);
+    }
+
+    /* Ctrl+F 搜索栏 */
+    .json-search-bar {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--primary);
+      border-radius: var(--radius-sm);
+      padding: 4px 8px;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+    }
+
+    .json-search-bar.open {
+      display: flex;
+    }
+
+    .json-search-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 12px;
+      color: var(--text-main);
+      min-width: 80px;
+    }
+
+    .json-search-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      white-space: nowrap;
+      padding: 0 4px;
+    }
+
+    .search-nav-btn {
+      width: 22px;
+      height: 22px;
+      border: 1px solid var(--border-light);
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .search-nav-btn:hover {
+      background: #e2e8f0;
     }
 
     .json-textarea {
@@ -527,11 +639,188 @@
       resize: none;
       outline: none;
       box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+      display: none;
+    }
+
+    .json-textarea.active {
+      display: block;
     }
 
     .json-textarea:focus {
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    /* 树形可折叠可编辑视图 */
+    .json-tree-view {
+      flex: 1;
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.65;
+      overflow: auto;
+      display: none;
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+    }
+
+    .json-tree-view.active {
+      display: block;
+    }
+
+    .jt-node {
+      position: relative;
+    }
+
+    .jt-children {
+      padding-left: 16px;
+      border-left: 1px dashed #e2e8f0;
+      margin-left: 6px;
+    }
+
+    .jt-node.collapsed > .jt-children {
+      display: none;
+    }
+
+    .jt-node.collapsed > .jt-close-line {
+      display: none;
+    }
+
+    .jt-summary {
+      display: none;
+      color: var(--text-muted);
+      font-size: 11px;
+      background: var(--bg-subtle);
+      padding: 0 6px;
+      border-radius: 4px;
+      margin: 0 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .jt-node.collapsed > .jt-line > .jt-summary {
+      display: inline-block;
+    }
+
+    .jt-node.collapsed > .jt-line > .jt-inline-close {
+      display: inline;
+    }
+
+    .jt-inline-close {
+      display: none;
+    }
+
+    .jt-line {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+
+    .jt-line:hover {
+      background: #f8fafc;
+    }
+
+    .jt-toggle {
+      display: inline-block;
+      width: 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      font-size: 10px;
+      text-align: center;
+      margin-right: 2px;
+      transition: transform 0.12s;
+    }
+
+    .jt-toggle:hover {
+      color: var(--primary);
+    }
+
+    .jt-key {
+      color: #0f172a;
+      font-weight: 600;
+      padding: 0 2px;
+      border-radius: 3px;
+    }
+
+    .jt-colon {
+      color: var(--text-muted);
+      margin-right: 6px;
+    }
+
+    .jt-val {
+      padding: 0 4px;
+      border-radius: 3px;
+      border: 1px solid transparent;
+      outline: none;
+      min-width: 14px;
+      display: inline-block;
+      word-break: break-all;
+      cursor: text;
+      transition: all 0.12s;
+    }
+
+    .jt-val:hover {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+    }
+
+    .jt-val:focus {
+      border-color: var(--primary);
+      background: #ffffff;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .jt-val-string {
+      color: #059669;
+    }
+    .jt-val-string::before,
+    .jt-val-string::after {
+      content: '"';
+      color: #94a3b8;
+    }
+
+    .jt-val-number {
+      color: #2563eb;
+      font-weight: 600;
+    }
+
+    .jt-val-boolean {
+      color: #d97706;
+      font-weight: 600;
+    }
+
+    .jt-val-null {
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    .jt-bracket {
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .jt-comma {
+      color: #94a3b8;
+    }
+
+    .jt-hit {
+      background: #fef08a !important;
+      color: #0f172a !important;
+      border-radius: 3px;
+      box-shadow: 0 0 0 1px #facc15;
+    }
+
+    .jt-hit-active {
+      background: #fb923c !important;
+      color: #ffffff !important;
+      border-radius: 3px;
+      box-shadow: 0 0 0 2px #ea580c;
     }
 
     .detail-footer {
@@ -728,6 +1017,32 @@
     </div>
 
     <div class="editor-container">
+      <div class="editor-toolbar">
+        <div class="mode-switch">
+          <button id="modeTreeBtn" class="mode-btn active" title="支持收起展开，点击数值可直接修改">树形预览 (可编辑)</button>
+          <button id="modeRawBtn" class="mode-btn" title="切换到纯文本 JSON 编辑器">JSON 源码</button>
+        </div>
+        <div class="tree-actions">
+          <button id="expandAllBtn" class="mini-action-btn" title="展开全部节点">展开</button>
+          <button id="collapseAllBtn" class="mini-action-btn" title="收起二级节点">收起</button>
+          <button id="openJsonSearchBtn" class="mini-action-btn" title="在 JSON 中搜索内容 (快捷键 Ctrl+F)">搜索 (Ctrl+F)</button>
+        </div>
+      </div>
+
+      <div id="jsonSearchBar" class="json-search-bar">
+        <input
+          id="jsonSearchInput"
+          class="json-search-input"
+          type="text"
+          placeholder="搜索键名或数值 (Enter 下一处 / Esc 关闭)..."
+        />
+        <span id="jsonSearchCount" class="json-search-count">0/0</span>
+        <button id="jsonSearchPrevBtn" class="search-nav-btn" title="上一处 (Shift+Enter)">↑</button>
+        <button id="jsonSearchNextBtn" class="search-nav-btn" title="下一处 (Enter)">↓</button>
+        <button id="jsonSearchCloseBtn" class="search-nav-btn" title="关闭搜索 (Esc)">×</button>
+      </div>
+
+      <div id="jsonTreeView" class="json-tree-view active"></div>
       <textarea id="jsonEditor" class="json-textarea" spellcheck="false"></textarea>
     </div>
 

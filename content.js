@@ -456,11 +456,169 @@
         line-height: 1.55;
         resize: none;
         outline: none;
+        display: none;
+      }
+      .qm-textarea.active {
+        display: block;
       }
       .qm-textarea:focus {
         border-color: #2563eb;
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
       }
+      .qm-editor-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .qm-mode-switch {
+        display: inline-flex;
+        background: #f1f5f9;
+        padding: 2px;
+        border-radius: 6px;
+        gap: 2px;
+      }
+      .qm-mode-btn {
+        border: none;
+        background: transparent;
+        color: #475569;
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .qm-mode-btn.active {
+        background: #ffffff;
+        color: #2563eb;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      }
+      .qm-search-bar {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        background: #ffffff;
+        border: 1px solid #2563eb;
+        border-radius: 6px;
+        padding: 4px 10px;
+      }
+      .qm-search-bar.open {
+        display: flex;
+      }
+      .qm-search-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        font-size: 12px;
+        color: #0f172a;
+      }
+      .qm-search-count {
+        font-size: 11.5px;
+        color: #64748b;
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      .qm-tree-view {
+        flex: 1;
+        width: 100%;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.65;
+        overflow: auto;
+        display: none;
+      }
+      .qm-tree-view.active {
+        display: block;
+      }
+      .jt-children {
+        padding-left: 16px;
+        border-left: 1px dashed #e2e8f0;
+        margin-left: 6px;
+      }
+      .jt-node.collapsed > .jt-children,
+      .jt-node.collapsed > .jt-close-line {
+        display: none;
+      }
+      .jt-summary {
+        display: none;
+        color: #94a3b8;
+        font-size: 11px;
+        background: #f1f5f9;
+        padding: 0 6px;
+        border-radius: 4px;
+        margin: 0 4px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .jt-node.collapsed > .jt-line > .jt-summary {
+        display: inline-block;
+      }
+      .jt-node.collapsed > .jt-line > .jt-inline-close {
+        display: inline;
+      }
+      .jt-inline-close {
+        display: none;
+      }
+      .jt-line {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+      .jt-line:hover {
+        background: #f8fafc;
+      }
+      .jt-toggle {
+        display: inline-block;
+        width: 14px;
+        color: #94a3b8;
+        cursor: pointer;
+        user-select: none;
+        font-size: 10px;
+        text-align: center;
+        margin-right: 2px;
+      }
+      .jt-key {
+        color: #0f172a;
+        font-weight: 600;
+        padding: 0 2px;
+      }
+      .jt-colon {
+        color: #94a3b8;
+        margin-right: 6px;
+      }
+      .jt-val {
+        padding: 0 4px;
+        border-radius: 3px;
+        border: 1px solid transparent;
+        outline: none;
+        min-width: 14px;
+        display: inline-block;
+        word-break: break-all;
+        cursor: text;
+      }
+      .jt-val:hover {
+        border-color: #cbd5e1;
+        background: #f8fafc;
+      }
+      .jt-val:focus {
+        border-color: #2563eb;
+        background: #ffffff;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+      }
+      .jt-val-string { color: #059669; }
+      .jt-val-string::before, .jt-val-string::after { content: '"'; color: #94a3b8; }
+      .jt-val-number { color: #2563eb; font-weight: 600; }
+      .jt-val-boolean { color: #d97706; font-weight: 600; }
+      .jt-val-null { color: #94a3b8; font-style: italic; }
+      .jt-bracket { color: #64748b; font-weight: 600; }
+      .jt-comma { color: #94a3b8; }
+      .jt-hit { background: #fef08a !important; color: #0f172a !important; border-radius: 3px; }
+      .jt-hit-active { background: #fb923c !important; color: #ffffff !important; border-radius: 3px; }
       .qm-footer {
         padding: 12px 16px;
         background: #f8fafc;
@@ -539,6 +697,27 @@
             </div>
           </div>
 
+          <div class="qm-editor-toolbar">
+            <div class="qm-mode-switch">
+              <button id="qmModeTreeBtn" class="qm-mode-btn active">树形预览 (可编辑)</button>
+              <button id="qmModeRawBtn" class="qm-mode-btn">JSON 源码</button>
+            </div>
+            <div class="qm-row">
+              <button id="qmExpandAllBtn" class="qm-btn">展开</button>
+              <button id="qmCollapseAllBtn" class="qm-btn">收起</button>
+              <button id="qmOpenSearchBtn" class="qm-btn">搜索 (Ctrl+F)</button>
+            </div>
+          </div>
+
+          <div id="qmSearchBar" class="qm-search-bar">
+            <input id="qmSearchInput" class="qm-search-input" type="text" placeholder="搜索键名或数值 (Enter 下一处 / Esc 关闭)..." />
+            <span id="qmSearchCount" class="qm-search-count">0/0</span>
+            <button id="qmSearchPrevBtn" class="qm-btn">↑</button>
+            <button id="qmSearchNextBtn" class="qm-btn">↓</button>
+            <button id="qmSearchCloseBtn" class="qm-btn">×</button>
+          </div>
+
+          <div id="qmTreeView" class="qm-tree-view active"></div>
           <textarea id="qmJsonTextarea" class="qm-textarea" spellcheck="false"></textarea>
         </div>
 
@@ -1001,6 +1180,190 @@
     label.textContent = len >= 0 ? `数组(${len}条):` : '数组扩充:';
   }
 
+  let modalEditorMode = 'tree';
+  let modalTreeData = null;
+  let modalSearchMatches = [];
+  let modalMatchIndex = -1;
+
+  function setByPath(root, path, newVal) {
+    let curr = root;
+    for (let i = 0; i < path.length - 1; i++) curr = curr[path[i]];
+    curr[path[path.length - 1]] = newVal;
+  }
+
+  function parseEditedPrimitive(rawText, origType) {
+    const trimmed = rawText.trim();
+    if (trimmed === 'null') return null;
+    if (trimmed === 'true') return true;
+    if (trimmed === 'false') return false;
+    if (origType === 'number' && trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed);
+    if (origType !== 'string' && trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed);
+    return rawText;
+  }
+
+  function buildObjectSummary(val, isArr) {
+    if (isArr) return `共 ${val.length} 条`;
+    const keys = Object.keys(val);
+    if (keys.length === 0) return '空对象';
+    return keys
+      .slice(0, 2)
+      .map((k) => {
+        const v = val[k];
+        if (v === null) return `${k}: null`;
+        if (typeof v === 'object') return `${k}: ${Array.isArray(v) ? '[...]' : '{...}'}`;
+        return `${k}: ${typeof v === 'string' ? `"${v.slice(0, 10)}"` : v}`;
+      })
+      .join(', ') + (keys.length > 2 ? ', ...' : '');
+  }
+
+  function createModalTreeDom(keyName, value, path, isLast, depth) {
+    const textarea = shadowRoot.getElementById('qmJsonTextarea');
+    if (value !== null && typeof value === 'object') {
+      const isArr = Array.isArray(value);
+      const openB = isArr ? '[' : '{';
+      const closeB = isArr ? ']' : '}';
+      const entries = isArr ? value.map((v, i) => [i, v]) : Object.entries(value);
+
+      const nodeEl = document.createElement('div');
+      nodeEl.className = 'jt-node';
+      nodeEl.setAttribute('data-depth', String(depth));
+
+      const lineEl = document.createElement('div');
+      lineEl.className = 'jt-line';
+
+      const toggleEl = document.createElement('span');
+      toggleEl.className = 'jt-toggle';
+      toggleEl.textContent = entries.length > 0 ? '▼' : '';
+      lineEl.appendChild(toggleEl);
+
+      if (keyName !== null) {
+        if (typeof keyName === 'string') {
+          const keyEl = document.createElement('span');
+          keyEl.className = 'jt-key';
+          keyEl.textContent = keyName;
+          lineEl.appendChild(keyEl);
+          const colonEl = document.createElement('span');
+          colonEl.className = 'jt-colon';
+          colonEl.textContent = ':';
+          lineEl.appendChild(colonEl);
+        } else {
+          const idxEl = document.createElement('span');
+          idxEl.style.cssText = 'color:#94a3b8;margin-right:6px;font-size:11px;user-select:none;';
+          idxEl.textContent = `#${keyName}`;
+          lineEl.appendChild(idxEl);
+        }
+      }
+
+      const openBracketEl = document.createElement('span');
+      openBracketEl.className = 'jt-bracket';
+      openBracketEl.textContent = openB;
+      lineEl.appendChild(openBracketEl);
+
+      const summaryEl = document.createElement('span');
+      summaryEl.className = 'jt-summary';
+      summaryEl.textContent = buildObjectSummary(value, isArr);
+      lineEl.appendChild(summaryEl);
+
+      const inlineCloseEl = document.createElement('span');
+      inlineCloseEl.className = 'jt-bracket jt-inline-close';
+      inlineCloseEl.textContent = closeB + (isLast ? '' : ',');
+      if (entries.length === 0) inlineCloseEl.style.display = 'inline';
+      lineEl.appendChild(inlineCloseEl);
+
+      const toggleCollapse = (e) => {
+        e.stopPropagation();
+        if (entries.length === 0) return;
+        const collapsed = nodeEl.classList.toggle('collapsed');
+        toggleEl.textContent = collapsed ? '▶' : '▼';
+      };
+      toggleEl.addEventListener('click', toggleCollapse);
+      summaryEl.addEventListener('click', toggleCollapse);
+      nodeEl.appendChild(lineEl);
+
+      if (entries.length > 0) {
+        const childrenEl = document.createElement('div');
+        childrenEl.className = 'jt-children';
+        entries.forEach(([k, v], idx) => {
+          childrenEl.appendChild(createModalTreeDom(k, v, [...path, k], idx === entries.length - 1, depth + 1));
+        });
+        nodeEl.appendChild(childrenEl);
+
+        const closeLineEl = document.createElement('div');
+        closeLineEl.className = 'jt-line jt-close-line';
+        closeLineEl.innerHTML = `<span style="display:inline-block;width:16px;"></span><span class="jt-bracket">${closeB}</span>${isLast ? '' : '<span class="jt-comma">,</span>'}`;
+        nodeEl.appendChild(closeLineEl);
+      }
+      return nodeEl;
+    }
+
+    const lineEl = document.createElement('div');
+    lineEl.className = 'jt-line';
+    const spacer = document.createElement('span');
+    spacer.style.cssText = 'display:inline-block;width:16px;';
+    lineEl.appendChild(spacer);
+
+    if (keyName !== null && typeof keyName === 'string') {
+      const keyEl = document.createElement('span');
+      keyEl.className = 'jt-key';
+      keyEl.textContent = keyName;
+      lineEl.appendChild(keyEl);
+      const colonEl = document.createElement('span');
+      colonEl.className = 'jt-colon';
+      colonEl.textContent = ':';
+      lineEl.appendChild(colonEl);
+    }
+
+    let currentType = value === null ? 'null' : typeof value;
+    const valEl = document.createElement('span');
+    valEl.className = `jt-val jt-val-${currentType}`;
+    valEl.contentEditable = 'true';
+    valEl.spellcheck = false;
+    valEl.textContent = value === null ? 'null' : String(value);
+
+    valEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        valEl.blur();
+      }
+    });
+    valEl.addEventListener('input', () => {
+      const newVal = parseEditedPrimitive(valEl.textContent, currentType);
+      setByPath(modalTreeData, path, newVal);
+      textarea.value = JSON.stringify(modalTreeData, null, 2);
+      updateModalArrayLabel();
+    });
+    lineEl.appendChild(valEl);
+
+    if (!isLast) {
+      const commaEl = document.createElement('span');
+      commaEl.className = 'jt-comma';
+      commaEl.textContent = ',';
+      lineEl.appendChild(commaEl);
+    }
+    return lineEl;
+  }
+
+  function renderModalTree() {
+    if (!shadowRoot) return;
+    const treeView = shadowRoot.getElementById('qmTreeView');
+    const textarea = shadowRoot.getElementById('qmJsonTextarea');
+    if (!treeView || !textarea) return;
+    try {
+      modalTreeData = JSON.parse(textarea.value);
+      treeView.innerHTML = '';
+      treeView.appendChild(createModalTreeDom(null, modalTreeData, [], true, 0));
+    } catch (e) {
+      treeView.innerHTML = `<div style="color:#dc2626;padding:12px;">JSON 语法有误，请切换至「JSON 源码」修复：${e.message}</div>`;
+    }
+  }
+
+  function syncModalEditorAndTree(jsonStr) {
+    const textarea = shadowRoot.getElementById('qmJsonTextarea');
+    textarea.value = jsonStr;
+    updateModalArrayLabel();
+    if (modalEditorMode === 'tree') renderModalTree();
+  }
+
   function selectRequestInModal(req, highlightWord) {
     currentEditingReq = req;
     const matchKeyInput = shadowRoot.getElementById('qmMatchKeyInput');
@@ -1010,27 +1373,17 @@
 
     if (!req) {
       matchKeyInput.value = '';
-      textarea.value = '// 当前页面尚未捕获到请求，请先按 F5 刷新一次页面';
+      syncModalEditorAndTree('// 当前页面尚未捕获到请求，请先按 F5 刷新一次页面');
       return;
     }
 
     const savedRule = mockRules.find((r) => r.matchKey && req.url.includes(r.matchKey));
     matchKeyInput.value = savedRule ? savedRule.matchKey : getDefaultMatchKey(req.url);
-    textarea.value = savedRule ? savedRule.mockBody : req.responseBody || '';
-    updateModalArrayLabel();
+    syncModalEditorAndTree(savedRule ? savedRule.mockBody : req.responseBody || '');
 
     if (highlightWord) {
       findInput.value = highlightWord;
       replaceInput.value = '';
-      setTimeout(() => {
-        const idx = textarea.value.toLowerCase().indexOf(highlightWord.toLowerCase());
-        if (idx >= 0) {
-          textarea.focus();
-          textarea.setSelectionRange(idx, idx + highlightWord.length);
-          const linesBefore = textarea.value.slice(0, idx).split('\n').length;
-          textarea.scrollTop = Math.max(0, (linesBefore - 5) * 19);
-        }
-      }, 30);
     }
   }
 
@@ -1078,6 +1431,18 @@
     const findInput = shadowRoot.getElementById('qmFindInput');
     const replaceInput = shadowRoot.getElementById('qmReplaceInput');
     const textarea = shadowRoot.getElementById('qmJsonTextarea');
+    const treeView = shadowRoot.getElementById('qmTreeView');
+    const modeTreeBtn = shadowRoot.getElementById('qmModeTreeBtn');
+    const modeRawBtn = shadowRoot.getElementById('qmModeRawBtn');
+    const expandAllBtn = shadowRoot.getElementById('qmExpandAllBtn');
+    const collapseAllBtn = shadowRoot.getElementById('qmCollapseAllBtn');
+    const openSearchBtn = shadowRoot.getElementById('qmOpenSearchBtn');
+    const searchBar = shadowRoot.getElementById('qmSearchBar');
+    const searchInput = shadowRoot.getElementById('qmSearchInput');
+    const searchCount = shadowRoot.getElementById('qmSearchCount');
+    const searchPrevBtn = shadowRoot.getElementById('qmSearchPrevBtn');
+    const searchNextBtn = shadowRoot.getElementById('qmSearchNextBtn');
+    const searchCloseBtn = shadowRoot.getElementById('qmSearchCloseBtn');
     const emptyBtn = shadowRoot.getElementById('qmEmptyBtn');
     const add1Btn = shadowRoot.getElementById('qmAdd1Btn');
     const add5Btn = shadowRoot.getElementById('qmAdd5Btn');
@@ -1090,6 +1455,122 @@
     modalBackdrop.addEventListener('click', closeModal);
     closeBtn.addEventListener('click', closeModal);
 
+    modeTreeBtn.addEventListener('click', () => {
+      modalEditorMode = 'tree';
+      modeTreeBtn.classList.add('active');
+      modeRawBtn.classList.remove('active');
+      treeView.classList.add('active');
+      textarea.classList.remove('active');
+      renderModalTree();
+    });
+    modeRawBtn.addEventListener('click', () => {
+      modalEditorMode = 'raw';
+      modeRawBtn.classList.add('active');
+      modeTreeBtn.classList.remove('active');
+      textarea.classList.add('active');
+      treeView.classList.remove('active');
+    });
+
+    expandAllBtn.addEventListener('click', () => {
+      treeView.querySelectorAll('.jt-node.collapsed').forEach((n) => {
+        n.classList.remove('collapsed');
+        const t = n.querySelector(':scope > .jt-line > .jt-toggle');
+        if (t) t.textContent = '▼';
+      });
+    });
+
+    collapseAllBtn.addEventListener('click', () => {
+      treeView.querySelectorAll('.jt-node').forEach((n) => {
+        if (Number(n.getAttribute('data-depth') || 0) >= 1) {
+          n.classList.add('collapsed');
+          const t = n.querySelector(':scope > .jt-line > .jt-toggle');
+          if (t && t.textContent) t.textContent = '▶';
+        }
+      });
+    });
+
+    function runModalSearch() {
+      const kw = searchInput.value.trim().toLowerCase();
+      treeView.querySelectorAll('.jt-hit, .jt-hit-active').forEach((el) => el.classList.remove('jt-hit', 'jt-hit-active'));
+      modalSearchMatches = [];
+      modalMatchIndex = -1;
+      if (!kw) {
+        searchCount.textContent = '0/0';
+        return;
+      }
+      treeView.querySelectorAll('.jt-key, .jt-val').forEach((el) => {
+        if ((el.textContent || '').toLowerCase().includes(kw)) {
+          el.classList.add('jt-hit');
+          modalSearchMatches.push(el);
+          let p = el.parentElement;
+          while (p && p !== treeView) {
+            if (p.classList.contains('jt-node') && p.classList.contains('collapsed')) {
+              p.classList.remove('collapsed');
+              const t = p.querySelector(':scope > .jt-line > .jt-toggle');
+              if (t && t.textContent) t.textContent = '▼';
+            }
+            p = p.parentElement;
+          }
+        }
+      });
+      if (modalSearchMatches.length > 0) {
+        modalMatchIndex = 0;
+        focusModalMatch();
+      } else {
+        searchCount.textContent = '0/0';
+      }
+    }
+
+    function focusModalMatch() {
+      if (modalSearchMatches.length === 0) return;
+      searchCount.textContent = `${modalMatchIndex + 1}/${modalSearchMatches.length}`;
+      modalSearchMatches.forEach((el, i) => el.classList.toggle('jt-hit-active', i === modalMatchIndex));
+      modalSearchMatches[modalMatchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    openSearchBtn.addEventListener('click', () => {
+      searchBar.classList.add('open');
+      searchInput.focus();
+      searchInput.select();
+    });
+    searchCloseBtn.addEventListener('click', () => {
+      searchBar.classList.remove('open');
+      treeView.querySelectorAll('.jt-hit, .jt-hit-active').forEach((el) => el.classList.remove('jt-hit', 'jt-hit-active'));
+      searchCount.textContent = '0/0';
+    });
+    searchInput.addEventListener('input', runModalSearch);
+    searchPrevBtn.addEventListener('click', () => {
+      if (modalSearchMatches.length > 0) {
+        modalMatchIndex = (modalMatchIndex - 1 + modalSearchMatches.length) % modalSearchMatches.length;
+        focusModalMatch();
+      }
+    });
+    searchNextBtn.addEventListener('click', () => {
+      if (modalSearchMatches.length > 0) {
+        modalMatchIndex = (modalMatchIndex + 1) % modalSearchMatches.length;
+        focusModalMatch();
+      }
+    });
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && modalSearchMatches.length > 0) {
+        e.preventDefault();
+        modalMatchIndex = (modalMatchIndex + (e.shiftKey ? -1 : 1) + modalSearchMatches.length) % modalSearchMatches.length;
+        focusModalMatch();
+      } else if (e.key === 'Escape') {
+        searchCloseBtn.click();
+      }
+    });
+
+    modal.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        e.stopPropagation();
+        searchBar.classList.add('open');
+        searchInput.focus();
+        searchInput.select();
+      }
+    });
+
     // 点击按钮录制任意按键
     hotkeyRecordBtn.addEventListener('click', () => {
       isRecordingHotkey = true;
@@ -1101,7 +1582,7 @@
       const findStr = findInput.value;
       const repStr = replaceInput.value;
       if (!findStr) return;
-      textarea.value = textarea.value.split(findStr).join(repStr);
+      syncModalEditorAndTree(textarea.value.split(findStr).join(repStr));
       findInput.value = repStr;
     });
 
@@ -1139,8 +1620,7 @@
         try {
           const parsed = JSON.parse(textarea.value);
           const emptied = emptyArraysInJson(parsed);
-          textarea.value = JSON.stringify(emptied, null, 2);
-          updateModalArrayLabel();
+          syncModalEditorAndTree(JSON.stringify(emptied, null, 2));
         } catch (e) {
           alert('JSON 语法错误，请检查引号或逗号：' + e.message);
         }
@@ -1160,8 +1640,7 @@
         }
         const parsed = JSON.parse(sourceText);
         const expanded = expandArraysInJson(parsed, count);
-        textarea.value = JSON.stringify(expanded, null, 2);
-        updateModalArrayLabel();
+        syncModalEditorAndTree(JSON.stringify(expanded, null, 2));
       } catch (e) {
         alert('JSON 语法错误，请检查引号或逗号：' + e.message);
       }

@@ -107,44 +107,95 @@ function updateArrayInfoLabel() {
   }
 }
 
-function expandArraysInJson(node, addCount = 5, depth = 0) {
-  if (depth > 8 || node === null || typeof node !== 'object') return node;
-
-  if (Array.isArray(node)) {
-    if (node.length > 0) {
-      const baseItem = node[node.length - 1];
-      const currentLen = node.length;
-      for (let i = 1; i <= addCount; i++) {
-        const idx = currentLen + i;
-        if (typeof baseItem === 'number') {
-          node.push(Math.round(baseItem * (0.6 + Math.random() * 0.9) + i * 5));
-        } else if (typeof baseItem === 'string') {
-          node.push(`${baseItem}_${idx}`);
-        } else if (baseItem && typeof baseItem === 'object') {
-          const cloned = JSON.parse(JSON.stringify(baseItem));
-          Object.keys(cloned).forEach((k) => {
-            const val = cloned[k];
-            if (typeof val === 'number') {
-              if (/id$/i.test(k)) {
-                cloned[k] = val + i;
-              } else if (!/^(status|type|state|code)$/i.test(k)) {
-                cloned[k] = Math.round((val || 50) * (0.5 + Math.random() * 1.1) + i * 3);
-              }
-            } else if (typeof val === 'string' && val.length < 30) {
-              cloned[k] = `${val}_${idx}`;
-            }
-          });
-          node.push(cloned);
+function cloneAndVaryItem(baseItem, idx) {
+  if (typeof baseItem === 'number') {
+    return Math.round((baseItem || 50) * (0.6 + Math.random() * 0.9) + idx * 5);
+  }
+  if (typeof baseItem === 'string') {
+    return `${baseItem}_${idx}`;
+  }
+  if (baseItem && typeof baseItem === 'object') {
+    const cloned = JSON.parse(JSON.stringify(baseItem));
+    Object.keys(cloned).forEach((k) => {
+      const val = cloned[k];
+      if (typeof val === 'number') {
+        if (/id$/i.test(k)) {
+          cloned[k] = val + idx;
+        } else if (!/^(status|type|state|code)$/i.test(k)) {
+          cloned[k] = Math.round((val || 50) * (0.5 + Math.random() * 1.1) + idx * 3);
+        }
+      } else if (typeof val === 'string' && val.length < 30) {
+        if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
+          const day = String(((idx % 28) + 1)).padStart(2, '0');
+          cloned[k] = val.replace(/-\d{2}(\s|$)/, `-${day}$1`);
+        } else {
+          cloned[k] = `${val.replace(/_\d+$/, '')}_${idx}`;
         }
       }
+    });
+    return cloned;
+  }
+  return baseItem;
+}
+
+function expandArraysInJson(rootNode, addCount = 5, reqItem = null) {
+  const fallbackTemplate =
+    (reqItem && reqItem.schemaSample && typeof reqItem.schemaSample === 'object'
+      ? reqItem.schemaSample
+      : null) || {
+      id: 1,
+      name: '测试数据',
+      label: '分类项',
+      value: 120,
+      count: 65,
+      createTime: '2026-10-21'
+    };
+
+  let expandedAnyArray = false;
+
+  function walk(node, depth) {
+    if (depth > 8 || node === null || typeof node !== 'object') return node;
+
+    if (Array.isArray(node)) {
+      expandedAnyArray = true;
+      const baseItem = node.length > 0 ? node[node.length - 1] : fallbackTemplate;
+      const currentLen = node.length;
+      for (let i = 1; i <= addCount; i++) {
+        node.push(cloneAndVaryItem(baseItem, currentLen + i));
+      }
+      return node;
+    }
+
+    let latestArrayLen = -1;
+    Object.keys(node).forEach((key) => {
+      node[key] = walk(node[key], depth + 1);
+      if (Array.isArray(node[key])) {
+        latestArrayLen = node[key].length;
+      }
+    });
+
+    if (latestArrayLen >= 0) {
+      Object.keys(node).forEach((k) => {
+        if (typeof node[k] === 'number' && /^(total|totalCount|count|totalElements|recordsTotal)$/i.test(k)) {
+          node[k] = Math.max(node[k], latestArrayLen);
+        }
+      });
     }
     return node;
   }
 
-  Object.keys(node).forEach((key) => {
-    node[key] = expandArraysInJson(node[key], addCount, depth + 1);
-  });
-  return node;
+  const res = walk(rootNode, 0);
+  if (!expandedAnyArray && res && typeof res === 'object' && !Array.isArray(res)) {
+    const targetKey = 'data' in res ? 'data' : 'result' in res ? 'result' : null;
+    if (targetKey && (res[targetKey] === null || (typeof res[targetKey] === 'object' && Object.keys(res[targetKey]).length === 0))) {
+      const arr = [];
+      for (let i = 1; i <= addCount; i++) {
+        arr.push(cloneAndVaryItem(fallbackTemplate, i));
+      }
+      res[targetKey] = arr;
+    }
+  }
+  return res;
 }
 
 // 一键置空接口数据（保留 code/status/msg 外壳，将所有数组清空为 []，将 total 设为 0）
@@ -275,12 +326,11 @@ function quickExpandAndSave(item, count) {
   try {
     const savedRule = mockRules.find((r) => r.matchKey && item.url.includes(r.matchKey));
     let sourceText = savedRule ? savedRule.mockBody : (item.responseBody || '');
-    // 如果之前被置空了（长度为0），自动基于原始数据扩充
-    if (countPrimaryArrayLength(sourceText) === 0 && item.originalBody) {
+    if (countPrimaryArrayLength(sourceText) === 0 && item.originalBody && countPrimaryArrayLength(item.originalBody) > 0) {
       sourceText = item.originalBody;
     }
     const parsed = JSON.parse(sourceText);
-    const expanded = expandArraysInJson(parsed, count);
+    const expanded = expandArraysInJson(parsed, count, item);
     const newBody = JSON.stringify(expanded, null, 2);
     const matchKey = savedRule ? savedRule.matchKey : getDefaultMatchKey(item.url);
 
@@ -313,11 +363,16 @@ backToListBtn.addEventListener('click', () => {
 function handleAddRows(count) {
   try {
     let sourceText = jsonEditor.value;
-    if (countPrimaryArrayLength(sourceText) === 0 && selectedReq && selectedReq.originalBody) {
+    if (
+      countPrimaryArrayLength(sourceText) === 0 &&
+      selectedReq &&
+      selectedReq.originalBody &&
+      countPrimaryArrayLength(selectedReq.originalBody) > 0
+    ) {
       sourceText = selectedReq.originalBody;
     }
     const parsed = JSON.parse(sourceText);
-    const expanded = expandArraysInJson(parsed, count);
+    const expanded = expandArraysInJson(parsed, count, selectedReq);
     jsonEditor.value = JSON.stringify(expanded, null, 2);
     updateArrayInfoLabel();
     showToast(`已追加 ${count} 条数据，点击下方保存即生效`);

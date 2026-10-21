@@ -769,44 +769,138 @@
     true
   );
 
-  function expandArraysInJson(node, addCount = 5, depth = 0) {
-    if (depth > 8 || node === null || typeof node !== 'object') return node;
+  // 根据字段名列表自动推断类型并生成单条模拟对象
+  function buildTemplateFromFieldNames(fieldNames) {
+    const obj = {};
+    fieldNames.forEach((rawKey) => {
+      const k = rawKey.trim();
+      if (!k) return;
+      if (/^(id|.*Id|.*No|key)$/i.test(k)) {
+        obj[k] = 1001;
+      } else if (/time|date|day/i.test(k)) {
+        obj[k] = '2026-10-21';
+      } else if (/num|count|sum|use|amount|price|total|val|rate|qty|weight|score|age|money/i.test(k)) {
+        obj[k] = 120;
+      } else if (/status|state|type/i.test(k)) {
+        obj[k] = 1;
+      } else {
+        obj[k] = '测试数据';
+      }
+    });
+    return obj;
+  }
 
-    if (Array.isArray(node)) {
-      if (node.length > 0) {
-        const baseItem = node[node.length - 1];
-        const currentLen = node.length;
-        for (let i = 1; i <= addCount; i++) {
-          const idx = currentLen + i;
-          if (typeof baseItem === 'number') {
-            node.push(Math.round(baseItem * (0.6 + Math.random() * 0.9) + i * 5));
-          } else if (typeof baseItem === 'string') {
-            node.push(`${baseItem}_${idx}`);
-          } else if (baseItem && typeof baseItem === 'object') {
-            const cloned = JSON.parse(JSON.stringify(baseItem));
-            Object.keys(cloned).forEach((k) => {
-              const val = cloned[k];
-              if (typeof val === 'number') {
-                if (/id$/i.test(k)) {
-                  cloned[k] = val + i;
-                } else if (!/^(status|type|state|code)$/i.test(k)) {
-                  cloned[k] = Math.round((val || 50) * (0.5 + Math.random() * 1.1) + i * 3);
-                }
-              } else if (typeof val === 'string' && val.length < 30) {
-                cloned[k] = `${val}_${idx}`;
-              }
-            });
-            node.push(cloned);
+  // 获取空数组的造数模板（优先级：1.接口历史结构缓存 -> 2.页面Vue/React表格列字段 -> 3.通用图表/列表全能模板）
+  function resolveFallbackTemplate(reqItem) {
+    if (reqItem && reqItem.schemaSample && typeof reqItem.schemaSample === 'object') {
+      return reqItem.schemaSample;
+    }
+    try {
+      const cache = JSON.parse(localStorage.getItem('__QM_SCHEMA_CACHE__') || '{}');
+      if (reqItem && reqItem.url) {
+        const pathname = new URL(reqItem.url, location.origin).pathname;
+        if (cache[pathname]) return cache[pathname];
+      }
+    } catch {}
+
+    const pageFieldsAttr = document.documentElement.getAttribute('data-qm-page-fields') || '';
+    if (pageFieldsAttr) {
+      const fields = pageFieldsAttr.split(',').filter(Boolean);
+      if (fields.length > 0) {
+        return buildTemplateFromFieldNames(fields);
+      }
+    }
+
+    return {
+      id: 1,
+      name: '测试数据',
+      label: '分类项',
+      value: 120,
+      count: 65,
+      createTime: '2026-10-21'
+    };
+  }
+
+  function cloneAndVaryItem(baseItem, idx) {
+    if (typeof baseItem === 'number') {
+      return Math.round((baseItem || 50) * (0.6 + Math.random() * 0.9) + idx * 5);
+    }
+    if (typeof baseItem === 'string') {
+      return `${baseItem}_${idx}`;
+    }
+    if (baseItem && typeof baseItem === 'object') {
+      const cloned = JSON.parse(JSON.stringify(baseItem));
+      Object.keys(cloned).forEach((k) => {
+        const val = cloned[k];
+        if (typeof val === 'number') {
+          if (/id$/i.test(k)) {
+            cloned[k] = val + idx;
+          } else if (!/^(status|type|state|code)$/i.test(k)) {
+            cloned[k] = Math.round((val || 50) * (0.5 + Math.random() * 1.1) + idx * 3);
+          }
+        } else if (typeof val === 'string' && val.length < 30) {
+          if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
+            const day = String(((idx % 28) + 1)).padStart(2, '0');
+            cloned[k] = val.replace(/-\d{2}(\s|$)/, `-${day}$1`);
+          } else {
+            cloned[k] = `${val.replace(/_\d+$/, '')}_${idx}`;
           }
         }
+      });
+      return cloned;
+    }
+    return baseItem;
+  }
+
+  function expandArraysInJson(rootNode, addCount = 5) {
+    const fallbackTemplate = resolveFallbackTemplate(currentEditingReq);
+    let expandedAnyArray = false;
+
+    function walk(node, depth) {
+      if (depth > 8 || node === null || typeof node !== 'object') return node;
+
+      if (Array.isArray(node)) {
+        expandedAnyArray = true;
+        const baseItem = node.length > 0 ? node[node.length - 1] : fallbackTemplate;
+        const currentLen = node.length;
+        for (let i = 1; i <= addCount; i++) {
+          node.push(cloneAndVaryItem(baseItem, currentLen + i));
+        }
+        return node;
+      }
+
+      let latestArrayLen = -1;
+      Object.keys(node).forEach((key) => {
+        node[key] = walk(node[key], depth + 1);
+        if (Array.isArray(node[key])) {
+          latestArrayLen = node[key].length;
+        }
+      });
+
+      // 自动同步更新同级的 total / totalCount / count 分页总数
+      if (latestArrayLen >= 0) {
+        Object.keys(node).forEach((k) => {
+          if (typeof node[k] === 'number' && /^(total|totalCount|count|totalElements|recordsTotal)$/i.test(k)) {
+            node[k] = Math.max(node[k], latestArrayLen);
+          }
+        });
       }
       return node;
     }
 
-    Object.keys(node).forEach((key) => {
-      node[key] = expandArraysInJson(node[key], addCount, depth + 1);
-    });
-    return node;
+    const res = walk(rootNode, 0);
+    // 如果原 JSON 里连空数组 [] 都没有（例如 data: null），自动将 data 初始化为数组并填入数据
+    if (!expandedAnyArray && res && typeof res === 'object' && !Array.isArray(res)) {
+      const targetKey = 'data' in res ? 'data' : 'result' in res ? 'result' : null;
+      if (targetKey && (res[targetKey] === null || (typeof res[targetKey] === 'object' && Object.keys(res[targetKey]).length === 0))) {
+        const arr = [];
+        for (let i = 1; i <= addCount; i++) {
+          arr.push(cloneAndVaryItem(fallbackTemplate, i));
+        }
+        res[targetKey] = arr;
+      }
+    }
+    return res;
   }
 
   function countPrimaryArrayLength(jsonStr) {
@@ -984,7 +1078,12 @@
     function addRowsInModal(count) {
       try {
         let sourceText = textarea.value;
-        if (countPrimaryArrayLength(sourceText) === 0 && currentEditingReq && currentEditingReq.originalBody) {
+        if (
+          countPrimaryArrayLength(sourceText) === 0 &&
+          currentEditingReq &&
+          currentEditingReq.originalBody &&
+          countPrimaryArrayLength(currentEditingReq.originalBody) > 0
+        ) {
           sourceText = currentEditingReq.originalBody;
         }
         const parsed = JSON.parse(sourceText);

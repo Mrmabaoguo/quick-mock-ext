@@ -1,6 +1,7 @@
 (function () {
   const capturedList = [];
   let mockRules = [];
+  let pluginEnabled = localStorage.getItem('__QUICK_MOCK_ENABLED__') !== '0';
   // 默认长按触发键为 Shift，支持用户按键录制自定义任意键（如 Shift, Alt, Control, KeyQ, Backquote, F2 等）
   let triggerKey = localStorage.getItem('__QM_TRIGGER_KEY__') || 'Shift';
   let isHoldingTrigger = false;
@@ -50,6 +51,11 @@
         localStorage.setItem('__QUICK_MOCK_RULES__', JSON.stringify(obj.mockRules));
       } catch {}
     }
+    if (typeof obj.pluginEnabled === 'boolean') {
+      try {
+        localStorage.setItem('__QUICK_MOCK_ENABLED__', obj.pluginEnabled ? '1' : '0');
+      } catch {}
+    }
     if (!isExtContextValid()) {
       if (cb) cb();
       return;
@@ -85,8 +91,32 @@
     );
   }
 
-  safeStorageGet(['mockRules', 'triggerKey'], (res) => {
+  function syncEnabledToPage(enabled) {
+    pluginEnabled = enabled !== false;
+    try {
+      localStorage.setItem('__QUICK_MOCK_ENABLED__', pluginEnabled ? '1' : '0');
+    } catch {}
+    window.postMessage(
+      {
+        source: 'QUICK_MOCK_CONTENT',
+        type: 'SYNC_ENABLED',
+        enabled: pluginEnabled
+      },
+      '*'
+    );
+    if (!pluginEnabled) {
+      isHoldingTrigger = false;
+      hideHighlight();
+    }
+  }
+
+  safeStorageGet(['mockRules', 'triggerKey', 'pluginEnabled'], (res) => {
     syncRulesToPage(res.mockRules || []);
+    if (typeof res.pluginEnabled === 'boolean') {
+      syncEnabledToPage(res.pluginEnabled);
+    } else {
+      syncEnabledToPage(true);
+    }
     if (res.triggerKey) {
       triggerKey = res.triggerKey;
       try {
@@ -101,6 +131,9 @@
         if (!isExtContextValid() || area !== 'local') return;
         if (changes.mockRules) {
           syncRulesToPage(changes.mockRules.newValue || []);
+        }
+        if (changes.pluginEnabled) {
+          syncEnabledToPage(changes.pluginEnabled.newValue !== false);
         }
         if (changes.triggerKey) {
           triggerKey = changes.triggerKey.newValue || 'Shift';
@@ -596,6 +629,7 @@
   function updateHoverHighlight(el) {
     ensureShadowUI();
     if (
+      !pluginEnabled ||
       !isHoldingTrigger ||
       !el ||
       triggerKey === 'None' ||
@@ -671,7 +705,7 @@
         return;
       }
 
-      if (isTypingInInput(e)) return;
+      if (!pluginEnabled || isTypingInInput(e)) return;
 
       if (isSameKey(e.key, triggerKey)) {
         if (!isHoldingTrigger) {

@@ -458,8 +458,40 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 const hotkeyRecordBtn = document.getElementById('hotkeyRecordBtn');
+const powerToggleBtn = document.getElementById('powerToggleBtn');
+const powerBtnText = document.getElementById('powerBtnText');
+const powerDot = document.getElementById('powerDot');
+const powerStatusLabel = document.getElementById('powerStatusLabel');
+
 let currentTriggerKey = 'Shift';
 let isRecordingKeyInPanel = false;
+let isPluginEnabled = true;
+
+function renderPowerState() {
+  if (!powerToggleBtn) return;
+  if (isPluginEnabled) {
+    powerToggleBtn.classList.remove('off');
+    powerDot.classList.remove('off');
+    powerStatusLabel.textContent = '插件运行中';
+    powerBtnText.textContent = '已开启 (点击关闭)';
+  } else {
+    powerToggleBtn.classList.add('off');
+    powerDot.classList.add('off');
+    powerStatusLabel.textContent = '插件已关闭';
+    powerBtnText.textContent = '已关闭 (点击开启)';
+  }
+}
+
+if (powerToggleBtn) {
+  powerToggleBtn.addEventListener('click', () => {
+    isPluginEnabled = !isPluginEnabled;
+    renderPowerState();
+    chrome.storage.local.set({ pluginEnabled: isPluginEnabled }, () => {
+      showToast(isPluginEnabled ? '插件已开启，正在刷新网页生效' : '插件已关闭，正在刷新恢复原始请求');
+      reloadActiveTab();
+    });
+  });
+}
 
 function formatKeyName(k) {
   if (k === 'Control') return 'Ctrl';
@@ -470,11 +502,11 @@ function formatKeyName(k) {
 function renderHotkeyBtn() {
   if (!hotkeyRecordBtn) return;
   if (isRecordingKeyInPanel) {
-    hotkeyRecordBtn.textContent = '请按任意键... (Esc取消)';
+    hotkeyRecordBtn.textContent = '请按任意键...';
     hotkeyRecordBtn.style.borderColor = '#ef4444';
     hotkeyRecordBtn.style.color = '#dc2626';
   } else {
-    hotkeyRecordBtn.textContent = `长按键: ${formatKeyName(currentTriggerKey)} (点击修改)`;
+    hotkeyRecordBtn.textContent = `长按键: ${formatKeyName(currentTriggerKey)}`;
     hotkeyRecordBtn.style.borderColor = 'var(--border-light)';
     hotkeyRecordBtn.style.color = 'var(--text-main)';
   }
@@ -513,6 +545,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
       currentTriggerKey = changes.triggerKey.newValue || 'Shift';
       renderHotkeyBtn();
     }
+    if (changes.pluginEnabled) {
+      isPluginEnabled = changes.pluginEnabled.newValue !== false;
+      renderPowerState();
+    }
     if (changes.mockRules) {
       mockRules = changes.mockRules.newValue || [];
       renderList();
@@ -520,12 +556,16 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-chrome.storage.local.get(['mockRules', 'triggerKey'], (res) => {
+chrome.storage.local.get(['mockRules', 'triggerKey', 'pluginEnabled'], (res) => {
   mockRules = res.mockRules || [];
   if (res.triggerKey) {
     currentTriggerKey = res.triggerKey;
   }
+  if (typeof res.pluginEnabled === 'boolean') {
+    isPluginEnabled = res.pluginEnabled;
+  }
   renderHotkeyBtn();
+  renderPowerState();
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0] && tabs[0].id) {
       chrome.tabs.sendMessage(tabs[0].id, { type: 'GET_CAPTURED_LIST' }, (resp) => {

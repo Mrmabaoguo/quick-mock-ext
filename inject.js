@@ -1,7 +1,20 @@
 (function () {
   const STORAGE_KEY = '__QUICK_MOCK_RULES__';
+  const ENABLED_KEY = '__QUICK_MOCK_ENABLED__';
+
+  function isPluginEnabled() {
+    try {
+      if (typeof window.__QUICK_MOCK_ENABLED__ === 'boolean') {
+        return window.__QUICK_MOCK_ENABLED__;
+      }
+      return localStorage.getItem(ENABLED_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  }
 
   function getRules() {
+    if (!isPluginEnabled()) return [];
     try {
       return window.__QUICK_MOCK_RULES__ || JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     } catch {
@@ -19,12 +32,21 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(rules));
       } catch {}
     }
+
+    if (event.data.type === 'SYNC_ENABLED') {
+      const enabled = event.data.enabled !== false;
+      window.__QUICK_MOCK_ENABLED__ = enabled;
+      try {
+        localStorage.setItem(ENABLED_KEY, enabled ? '1' : '0');
+      } catch {}
+    }
   });
 
   // 当用户在页面上按住快捷键点击 Canvas 图表时，尝试从 ECharts 实例提取特征关键词
   document.addEventListener(
     'mousedown',
     (e) => {
+      if (!isPluginEnabled()) return;
       const target = e.target;
       if (!target || !(target instanceof Element)) return;
       const echartsDom = target.closest('[_echarts_instance_]');
@@ -72,6 +94,7 @@
   }
 
   function findMatchingRule(fullUrl, method) {
+    if (!isPluginEnabled()) return null;
     const rules = getRules();
     return rules.find((r) => {
       if (!r.enabled || !r.matchKey) return false;
@@ -91,6 +114,7 @@
   }
 
   function notifyCaptured(payload) {
+    if (!isPluginEnabled()) return;
     window.postMessage(
       {
         source: 'QUICK_MOCK_INJECT',
@@ -104,6 +128,10 @@
   // 1. 劫持 window.fetch
   const origFetch = window.fetch;
   window.fetch = async function (...args) {
+    if (!isPluginEnabled()) {
+      return origFetch.apply(this, args);
+    }
+
     const input = args[0];
     const init = args[1] || {};
     const rawUrl = typeof input === 'string' ? input : (input && input.url) || String(input);
@@ -171,7 +199,7 @@
 
     if (!isStaticAsset(fullUrl)) {
       xhr.addEventListener('readystatechange', function () {
-        if (xhr.readyState !== 4) return;
+        if (!isPluginEnabled() || xhr.readyState !== 4) return;
 
         let rawText = '';
         try {
@@ -225,8 +253,8 @@
             method: reqMethod,
             status: xhr.status,
             mocked: false,
-            originalBody: tryFormatJson(rawText),
-            responseBody: tryFormatJson(rawText),
+            originalBody: tryFormatJson(textOrRaw(rawText)),
+            responseBody: tryFormatJson(textOrRaw(rawText)),
             time: new Date().toLocaleTimeString()
           });
         }
@@ -235,4 +263,8 @@
 
     return origOpen.call(this, method, url, ...rest);
   };
+
+  function textOrRaw(str) {
+    return str || '';
+  }
 })();

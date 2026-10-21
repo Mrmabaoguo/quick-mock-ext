@@ -581,12 +581,79 @@
     .toast-banner.show {
       opacity: 1;
     }
+
+    .master-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .brand-status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+      transition: all 0.2s;
+    }
+
+    .status-dot.off {
+      background: var(--text-muted);
+      box-shadow: none;
+    }
+
+    .power-toggle-btn {
+      height: 26px;
+      padding: 0 10px;
+      border-radius: 99px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      border: 1px solid var(--success-border);
+      background: var(--success-soft);
+      color: var(--success);
+    }
+
+    .power-toggle-btn.off {
+      border-color: var(--border-light);
+      background: var(--bg-subtle);
+      color: var(--text-sub);
+    }
+
+    .power-toggle-btn:hover {
+      opacity: 0.9;
+    }
   </style>
 </head>
 <body>
   <!-- 视图 1：全屏接口列表页 -->
   <div id="listView" class="view active">
     <div class="top-bar">
+      <div class="master-bar">
+        <div class="brand-status">
+          <span id="powerDot" class="status-dot"></span>
+          <span id="powerStatusLabel">插件运行中</span>
+        </div>
+        <button id="powerToggleBtn" class="power-toggle-btn" title="点击一键开启或关闭插件拦截与点选功能">
+          <span id="powerBtnText">已开启 (点击关闭)</span>
+        </button>
+      </div>
+
       <div class="search-group">
         <div class="search-input-wrap">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -610,20 +677,20 @@
         </button>
       </div>
 
-      <div class="filter-bar">
-        <div class="tabs">
-          <button id="tabAll" class="tab-btn active">全部 (<span id="countAll">0</span>)</button>
-          <button id="tabMocked" class="tab-btn">已改写 (<span id="countMocked">0</span>)</button>
+      <div class="filter-bar" style="gap:6px;flex-wrap:wrap;">
+        <div class="tabs" style="flex-shrink:0;">
+          <button id="tabAll" class="tab-btn active" style="white-space:nowrap;">全部 (<span id="countAll">0</span>)</button>
+          <button id="tabMocked" class="tab-btn" style="white-space:nowrap;">已改写 (<span id="countMocked">0</span>)</button>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
           <button
             id="hotkeyRecordBtn"
-            style="height:24px;border:1px solid var(--border-light);border-radius:5px;font-size:11px;padding:0 8px;background:var(--bg-card);color:var(--text-main);cursor:pointer;font-weight:500;"
+            style="height:24px;border:1px solid var(--border-light);border-radius:5px;font-size:11px;padding:0 7px;background:var(--bg-card);color:var(--text-main);cursor:pointer;font-weight:500;white-space:nowrap;"
             title="点击后按键盘任意键即可修改长按触发键"
           >
-            长按键: Shift (点击修改)
+            长按键: Shift
           </button>
-          <button id="clearRulesBtn" class="text-link-danger">重置改写</button>
+          <button id="clearRulesBtn" class="text-link-danger" style="white-space:nowrap;">重置改写</button>
         </div>
       </div>
     </div>

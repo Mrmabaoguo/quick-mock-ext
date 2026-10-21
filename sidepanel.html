@@ -524,28 +524,33 @@
 
     .mode-switch {
       display: inline-flex;
-      background: var(--bg-subtle);
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
       padding: 2px;
-      border-radius: 6px;
+      border-radius: 7px;
       gap: 2px;
     }
 
     .mode-btn {
       border: none;
       background: transparent;
-      color: var(--text-sub);
-      padding: 3px 9px;
-      border-radius: 4px;
-      font-size: 11.5px;
+      color: #1e40af;
+      padding: 4px 11px;
+      border-radius: 5px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.12s;
+      transition: all 0.15s;
+    }
+
+    .mode-btn:hover {
+      background: rgba(37, 99, 235, 0.08);
     }
 
     .mode-btn.active {
-      background: var(--bg-card);
-      color: var(--primary);
-      box-shadow: var(--shadow-sm);
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
     }
 
     .tree-actions {
@@ -1019,12 +1024,12 @@
     <div class="editor-container">
       <div class="editor-toolbar">
         <div class="mode-switch">
-          <button id="modeTreeBtn" class="mode-btn active" title="支持收起展开，点击数值可直接修改">树形预览 (可编辑)</button>
-          <button id="modeRawBtn" class="mode-btn" title="切换到纯文本 JSON 编辑器">JSON 源码</button>
+          <button id="modeRawBtn" class="mode-btn active" title="原本的纯文本 JSON 编辑模式">JSON 文本 (原本模式)</button>
+          <button id="modeTreeBtn" class="mode-btn" title="支持收起展开，点击数值可直接修改">树形预览 (可收起/改值)</button>
         </div>
         <div class="tree-actions">
-          <button id="expandAllBtn" class="mini-action-btn" title="展开全部节点">展开</button>
-          <button id="collapseAllBtn" class="mini-action-btn" title="收起二级节点">收起</button>
+          <button id="expandAllBtn" class="mini-action-btn" style="display:none;" title="展开全部节点">展开</button>
+          <button id="collapseAllBtn" class="mini-action-btn" style="display:none;" title="收起二级节点">收起</button>
           <button id="openJsonSearchBtn" class="mini-action-btn" title="在 JSON 中搜索内容 (快捷键 Ctrl+F)">搜索 (Ctrl+F)</button>
         </div>
       </div>
@@ -1042,8 +1047,8 @@
         <button id="jsonSearchCloseBtn" class="search-nav-btn" title="关闭搜索 (Esc)">×</button>
       </div>
 
-      <div id="jsonTreeView" class="json-tree-view active"></div>
-      <textarea id="jsonEditor" class="json-textarea" spellcheck="false"></textarea>
+      <textarea id="jsonEditor" class="json-textarea active" spellcheck="false"></textarea>
+      <div id="jsonTreeView" class="json-tree-view"></div>
     </div>
 
     <div class="detail-footer">

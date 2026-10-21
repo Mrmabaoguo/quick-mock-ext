@@ -439,7 +439,7 @@ const jsonSearchPrevBtn = document.getElementById('jsonSearchPrevBtn');
 const jsonSearchNextBtn = document.getElementById('jsonSearchNextBtn');
 const jsonSearchCloseBtn = document.getElementById('jsonSearchCloseBtn');
 
-let currentEditorMode = 'tree'; // 'tree' | 'raw'
+let currentEditorMode = 'raw'; // 'raw' (原本 JSON 文本模式) | 'tree' (树形折叠可改值模式)
 let currentTreeData = null;
 let searchMatches = [];
 let currentMatchIndex = -1;

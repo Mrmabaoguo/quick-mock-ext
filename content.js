@@ -699,12 +699,12 @@
 
           <div class="qm-editor-toolbar">
             <div class="qm-mode-switch">
-              <button id="qmModeTreeBtn" class="qm-mode-btn active">树形预览 (可编辑)</button>
-              <button id="qmModeRawBtn" class="qm-mode-btn">JSON 源码</button>
+              <button id="qmModeRawBtn" class="qm-mode-btn active">JSON 文本 (原本模式)</button>
+              <button id="qmModeTreeBtn" class="qm-mode-btn">树形预览 (可收起/改值)</button>
             </div>
             <div class="qm-row">
-              <button id="qmExpandAllBtn" class="qm-btn">展开</button>
-              <button id="qmCollapseAllBtn" class="qm-btn">收起</button>
+              <button id="qmExpandAllBtn" class="qm-btn" style="display:none;">展开</button>
+              <button id="qmCollapseAllBtn" class="qm-btn" style="display:none;">收起</button>
               <button id="qmOpenSearchBtn" class="qm-btn">搜索 (Ctrl+F)</button>
             </div>
           </div>
@@ -717,8 +717,8 @@
             <button id="qmSearchCloseBtn" class="qm-btn">×</button>
           </div>
 
-          <div id="qmTreeView" class="qm-tree-view active"></div>
-          <textarea id="qmJsonTextarea" class="qm-textarea" spellcheck="false"></textarea>
+          <textarea id="qmJsonTextarea" class="qm-textarea active" spellcheck="false"></textarea>
+          <div id="qmTreeView" class="qm-tree-view"></div>
         </div>
 
         <div class="qm-footer">
@@ -1180,7 +1180,7 @@
     label.textContent = len >= 0 ? `数组(${len}条):` : '数组扩充:';
   }
 
-  let modalEditorMode = 'tree';
+  let modalEditorMode = 'raw';
   let modalTreeData = null;
   let modalSearchMatches = [];
   let modalMatchIndex = -1;
@@ -1461,6 +1461,8 @@
       modeRawBtn.classList.remove('active');
       treeView.classList.add('active');
       textarea.classList.remove('active');
+      expandAllBtn.style.display = '';
+      collapseAllBtn.style.display = '';
       renderModalTree();
     });
     modeRawBtn.addEventListener('click', () => {
@@ -1469,6 +1471,8 @@
       modeTreeBtn.classList.remove('active');
       textarea.classList.add('active');
       treeView.classList.remove('active');
+      expandAllBtn.style.display = 'none';
+      collapseAllBtn.style.display = 'none';
     });
 
     expandAllBtn.addEventListener('click', () => {

@@ -92,12 +92,17 @@
   // 自动从页面上的 Vue (Element Plus / Element UI / AntD Vue) 或 React 表格组件实例中提取字段名 (prop / dataIndex)
   function extractPageComponentFields(targetEl) {
     const fields = new Set();
+    const IGNORED_PROPS = new Set([
+      'length', 'map', 'forEach', 'filter', 'slice', 'push', 'includes', 'indexOf',
+      'toString', 'valueOf', 'join', 'reduce', 'find', 'some', 'every', 'keys', 'values'
+    ]);
     try {
       const rootScope =
         (targetEl && targetEl.closest && targetEl.closest('.el-table, .ant-table-wrapper, table, .el-card')) ||
         document;
       const allEls = rootScope.querySelectorAll('*');
-      const limit = Math.min(allEls.length, 400);
+      const limit = Math.min(allEls.length, 500);
+      const visitedRenderFns = new Set();
 
       for (let i = 0; i < limit; i++) {
         const el = allEls[i];
@@ -107,16 +112,24 @@
           fields.add(attrProp);
         }
 
-        // 2. Vue 2 (__vue__) 组件实例（如 el-table-column）
+        // 2. Vue 2 (__vue__) 组件实例（如 el-table / el-table-column）
         if (el.__vue__) {
           const vm = el.__vue__;
           if (vm.prop && typeof vm.prop === 'string') fields.add(vm.prop);
           if (vm.columnConfig && vm.columnConfig.property) fields.add(vm.columnConfig.property);
-          if (Array.isArray(vm.columns)) {
-            vm.columns.forEach((col) => {
+          const storeCols =
+            vm.columns ||
+            (vm.store && vm.store.states && (vm.store.states.columns || vm.store.states._columns));
+          if (Array.isArray(storeCols)) {
+            storeCols.forEach((col) => {
               const p = col && (col.property || col.prop || col.dataIndex || col.key);
               if (p && typeof p === 'string' && /^[a-zA-Z_]/.test(p)) fields.add(p);
             });
+          }
+          const renderFn = vm.$options && vm.$options.render;
+          if (typeof renderFn === 'function' && !visitedRenderFns.has(renderFn)) {
+            visitedRenderFns.add(renderFn);
+            extractFieldsFromCodeStr(renderFn.toString(), fields, IGNORED_PROPS);
           }
         }
 
@@ -132,6 +145,23 @@
                 const p = col && (col.dataIndex || col.prop || col.property || col.key);
                 if (p && typeof p === 'string' && /^[a-zA-Z_]/.test(p)) fields.add(p);
               });
+            }
+            const states = comp.ctx && comp.ctx.store && comp.ctx.store.states;
+            if (states) {
+              const cols =
+                (states.columns && (states.columns.value || states.columns)) ||
+                (states._columns && (states._columns.value || states._columns));
+              if (Array.isArray(cols)) {
+                cols.forEach((col) => {
+                  const p = col && (col.property || col.prop || col.dataIndex);
+                  if (p && typeof p === 'string' && /^[a-zA-Z_]/.test(p)) fields.add(p);
+                });
+              }
+            }
+            const renderFn = (comp.type && comp.type.render) || comp.render;
+            if (typeof renderFn === 'function' && !visitedRenderFns.has(renderFn)) {
+              visitedRenderFns.add(renderFn);
+              extractFieldsFromCodeStr(renderFn.toString(), fields, IGNORED_PROPS);
             }
             comp = comp.parent;
           }
@@ -156,6 +186,27 @@
     return Array.from(fields).slice(0, 20);
   }
 
+  function extractFieldsFromCodeStr(code, fieldsSet, ignoredSet) {
+    if (!code || typeof code !== 'string') return;
+    const propRegex = /\b(?:prop|property|dataIndex|field)\s*:\s*["']([a-zA-Z_][a-zA-Z0-9_]*)["']/g;
+    let m;
+    while ((m = propRegex.exec(code)) !== null) {
+      if (!ignoredSet.has(m[1])) fieldsSet.add(m[1]);
+    }
+    const rowRegex = /\b(?:row|record)\s*\.\s*([a-zA-Z_][a-zA-Z0-9_]*)/g;
+    while ((m = rowRegex.exec(code)) !== null) {
+      if (!ignoredSet.has(m[1])) fieldsSet.add(m[1]);
+    }
+  }
+
+  function syncPageFieldsAttr(targetEl) {
+    const pageFields = extractPageComponentFields(targetEl || document);
+    if (pageFields.length > 0) {
+      document.documentElement.setAttribute('data-qm-page-fields', pageFields.join(','));
+    }
+    return pageFields;
+  }
+
   window.addEventListener('message', (event) => {
     if (!event.data || event.data.source !== 'QUICK_MOCK_CONTENT') return;
 
@@ -174,6 +225,10 @@
         localStorage.setItem(ENABLED_KEY, enabled ? '1' : '0');
       } catch {}
     }
+
+    if (event.data.type === 'EXTRACT_PAGE_FIELDS') {
+      syncPageFieldsAttr(document);
+    }
   });
 
   // 当用户在页面上按住快捷键点击时，自动提取 ECharts 特征词 + 页面表格组件字段名
@@ -185,10 +240,7 @@
       if (!target || !(target instanceof Element)) return;
 
       // 提取当前区域或页面的 Vue/React 表格字段名供空数据造数使用
-      const pageFields = extractPageComponentFields(target);
-      if (pageFields.length > 0) {
-        document.documentElement.setAttribute('data-qm-page-fields', pageFields.join(','));
-      }
+      syncPageFieldsAttr(target);
 
       const echartsDom = target.closest('[_echarts_instance_]');
       if (echartsDom && window.echarts && typeof window.echarts.getInstanceByDom === 'function') {
@@ -256,6 +308,11 @@
 
   function notifyCaptured(payload) {
     if (!isPluginEnabled()) return;
+    if (payload && !payload.schemaSample) {
+      const pf = syncPageFieldsAttr(document);
+      if (pf.length > 0) payload.pageFields = pf;
+      setTimeout(() => syncPageFieldsAttr(document), 350);
+    }
     window.postMessage(
       {
         source: 'QUICK_MOCK_INJECT',

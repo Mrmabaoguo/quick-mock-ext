@@ -147,6 +147,15 @@
       chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!isExtContextValid()) return;
         if (msg && msg.type === 'GET_CAPTURED_LIST') {
+          window.postMessage({ source: 'QUICK_MOCK_CONTENT', type: 'EXTRACT_PAGE_FIELDS' }, '*');
+          const pf = (document.documentElement.getAttribute('data-qm-page-fields') || '')
+            .split(',')
+            .filter(Boolean);
+          if (pf.length > 0) {
+            capturedList.forEach((item) => {
+              if (!item.pageFields || item.pageFields.length === 0) item.pageFields = pf;
+            });
+          }
           sendResponse({ list: capturedList });
           return true;
         }
@@ -164,6 +173,13 @@
     }
     const item = event.data.payload;
     if (!item || !item.url) return;
+
+    const pf = (document.documentElement.getAttribute('data-qm-page-fields') || '')
+      .split(',')
+      .filter(Boolean);
+    if (pf.length > 0 && (!item.pageFields || item.pageFields.length === 0)) {
+      item.pageFields = pf;
+    }
 
     const existingIdx = capturedList.findIndex(
       (x) => x.url === item.url && x.method === item.method
@@ -889,15 +905,71 @@
     }
 
     const res = walk(rootNode, 0);
-    // 如果原 JSON 里连空数组 [] 都没有（例如 data: null），自动将 data 初始化为数组并填入数据
+    // 如果原 JSON 里连空数组 [] 都没有（例如 {code: 0, msg: "没有相关数据"} 或 data: null），自动补齐 data 数组结构
     if (!expandedAnyArray && res && typeof res === 'object' && !Array.isArray(res)) {
-      const targetKey = 'data' in res ? 'data' : 'result' in res ? 'result' : null;
-      if (targetKey && (res[targetKey] === null || (typeof res[targetKey] === 'object' && Object.keys(res[targetKey]).length === 0))) {
-        const arr = [];
-        for (let i = 1; i <= addCount; i++) {
-          arr.push(cloneAndVaryItem(fallbackTemplate, i));
+      const arr = [];
+      for (let i = 1; i <= addCount; i++) {
+        arr.push(cloneAndVaryItem(fallbackTemplate, i));
+      }
+
+      // 若 msg 为空数据提示语，自动改为成功提示，并对齐同站有数据接口的成功状态码
+      const msgKey = 'msg' in res ? 'msg' : 'message' in res ? 'message' : null;
+      if (msgKey && typeof res[msgKey] === 'string' && /没有|暂无|无数据|空|失败|error|fail/i.test(res[msgKey])) {
+        res[msgKey] = '操作成功';
+        if ('code' in res) {
+          const refWithData = capturedList.find((r) => r !== currentEditingReq && countPrimaryArrayLength(r.responseBody) > 0);
+          if (refWithData) {
+            try {
+              const refObj = JSON.parse(refWithData.responseBody);
+              if ('code' in refObj && refObj.code !== undefined) res.code = refObj.code;
+            } catch {}
+          }
         }
-        res[targetKey] = arr;
+      }
+
+      const targetKey = 'result' in res ? 'result' : 'data';
+      const existingTarget = res[targetKey];
+
+      if (existingTarget && typeof existingTarget === 'object' && !Array.isArray(existingTarget) && Object.keys(existingTarget).length > 0) {
+        // 如果 data 已经是分页对象（如 { total: 0, current: 1 }），在其内部挂载数组
+        const listKey =
+          'records' in existingTarget || 'current' in existingTarget || 'pages' in existingTarget
+            ? 'records'
+            : 'rows' in existingTarget
+              ? 'rows'
+              : 'list';
+        existingTarget[listKey] = arr;
+        Object.keys(existingTarget).forEach((k) => {
+          if (typeof existingTarget[k] === 'number' && /^(total|totalCount|count|totalElements|recordsTotal)$/i.test(k)) {
+            existingTarget[k] = arr.length;
+          }
+        });
+      } else {
+        // 检查同站其他分页接口是否采用 data.records 或 data.list 结构
+        let nestedListKey = null;
+        if (currentEditingReq && /page|Page/.test(currentEditingReq.url)) {
+          for (const r of capturedList) {
+            if (!r.responseBody) continue;
+            try {
+              const parsedR = JSON.parse(r.responseBody);
+              const d = parsedR && (parsedR.data || parsedR.result);
+              if (d && typeof d === 'object' && !Array.isArray(d)) {
+                if (Array.isArray(d.records)) { nestedListKey = 'records'; break; }
+                if (Array.isArray(d.list)) { nestedListKey = 'list'; break; }
+                if (Array.isArray(d.rows)) { nestedListKey = 'rows'; break; }
+              }
+            } catch {}
+          }
+        }
+        if (nestedListKey === 'records') {
+          res[targetKey] = { records: arr, total: arr.length, size: Math.max(10, arr.length), current: 1 };
+        } else if (nestedListKey === 'list') {
+          res[targetKey] = { list: arr, total: arr.length, pageNum: 1, pageSize: Math.max(10, arr.length) };
+        } else if (nestedListKey === 'rows') {
+          res[targetKey] = { rows: arr, total: arr.length };
+        } else {
+          res[targetKey] = arr;
+        }
       }
     }
     return res;
@@ -1056,8 +1128,8 @@
       }
       const res = walk(node, 0);
       if (!foundArray && res && typeof res === 'object' && !Array.isArray(res)) {
-        if ('data' in res) res.data = [];
-        else if ('result' in res) res.result = [];
+        if ('result' in res) res.result = [];
+        else res.data = [];
       }
       return res;
     }

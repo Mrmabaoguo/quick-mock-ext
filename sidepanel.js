@@ -138,19 +138,50 @@ function cloneAndVaryItem(baseItem, idx) {
   return baseItem;
 }
 
-function expandArraysInJson(rootNode, addCount = 5, reqItem = null) {
-  const fallbackTemplate =
-    (reqItem && reqItem.schemaSample && typeof reqItem.schemaSample === 'object'
-      ? reqItem.schemaSample
-      : null) || {
-      id: 1,
-      name: '测试数据',
-      label: '分类项',
-      value: 120,
-      count: 65,
-      createTime: '2026-10-21'
-    };
+function buildTemplateFromFieldNames(fieldNames) {
+  const obj = {};
+  fieldNames.forEach((rawKey) => {
+    const k = String(rawKey || '').trim();
+    if (!k) return;
+    if (/^(id|.*Id|.*No|key)$/i.test(k)) {
+      obj[k] = 1001;
+    } else if (/time|date|day/i.test(k)) {
+      obj[k] = '2026-10-21';
+    } else if (/num|count|sum|use|amount|price|total|val|rate|qty|weight|score|age|money|angle|height|speed|power|temp|calibration/i.test(k)) {
+      obj[k] = 120;
+    } else if (/status|state|type/i.test(k)) {
+      obj[k] = 1;
+    } else {
+      obj[k] = '测试数据';
+    }
+  });
+  return obj;
+}
 
+function resolveFallbackTemplate(reqItem) {
+  if (reqItem && reqItem.schemaSample && typeof reqItem.schemaSample === 'object') {
+    return reqItem.schemaSample;
+  }
+  const pf =
+    (reqItem && Array.isArray(reqItem.pageFields) && reqItem.pageFields.length > 0
+      ? reqItem.pageFields
+      : null) ||
+    (capturedRequests.find((r) => Array.isArray(r.pageFields) && r.pageFields.length > 0) || {}).pageFields;
+  if (Array.isArray(pf) && pf.length > 0) {
+    return buildTemplateFromFieldNames(pf);
+  }
+  return {
+    id: 1,
+    name: '测试数据',
+    label: '分类项',
+    value: 120,
+    count: 65,
+    createTime: '2026-10-21'
+  };
+}
+
+function expandArraysInJson(rootNode, addCount = 5, reqItem = null) {
+  const fallbackTemplate = resolveFallbackTemplate(reqItem);
   let expandedAnyArray = false;
 
   function walk(node, depth) {
@@ -185,14 +216,69 @@ function expandArraysInJson(rootNode, addCount = 5, reqItem = null) {
   }
 
   const res = walk(rootNode, 0);
+  // 如果原 JSON 里连空数组 [] 或 data 字段都没有（例如 {code: 0, msg: "没有相关数据"}），自动补齐 data 数组结构
   if (!expandedAnyArray && res && typeof res === 'object' && !Array.isArray(res)) {
-    const targetKey = 'data' in res ? 'data' : 'result' in res ? 'result' : null;
-    if (targetKey && (res[targetKey] === null || (typeof res[targetKey] === 'object' && Object.keys(res[targetKey]).length === 0))) {
-      const arr = [];
-      for (let i = 1; i <= addCount; i++) {
-        arr.push(cloneAndVaryItem(fallbackTemplate, i));
+    const arr = [];
+    for (let i = 1; i <= addCount; i++) {
+      arr.push(cloneAndVaryItem(fallbackTemplate, i));
+    }
+
+    // 若 msg 为空数据提示语，自动改为成功提示，并对齐同站有数据接口的成功状态码
+    const msgKey = 'msg' in res ? 'msg' : 'message' in res ? 'message' : null;
+    if (msgKey && typeof res[msgKey] === 'string' && /没有|暂无|无数据|空|失败|error|fail/i.test(res[msgKey])) {
+      res[msgKey] = '操作成功';
+      if ('code' in res) {
+        const refWithData = capturedRequests.find((r) => r !== reqItem && countPrimaryArrayLength(r.responseBody) > 0);
+        if (refWithData) {
+          try {
+            const refObj = JSON.parse(refWithData.responseBody);
+            if ('code' in refObj && refObj.code !== undefined) res.code = refObj.code;
+          } catch {}
+        }
       }
-      res[targetKey] = arr;
+    }
+
+    const targetKey = 'result' in res ? 'result' : 'data';
+    const existingTarget = res[targetKey];
+
+    if (existingTarget && typeof existingTarget === 'object' && !Array.isArray(existingTarget) && Object.keys(existingTarget).length > 0) {
+      const listKey =
+        'records' in existingTarget || 'current' in existingTarget || 'pages' in existingTarget
+          ? 'records'
+          : 'rows' in existingTarget
+            ? 'rows'
+            : 'list';
+      existingTarget[listKey] = arr;
+      Object.keys(existingTarget).forEach((k) => {
+        if (typeof existingTarget[k] === 'number' && /^(total|totalCount|count|totalElements|recordsTotal)$/i.test(k)) {
+          existingTarget[k] = arr.length;
+        }
+      });
+    } else {
+      let nestedListKey = null;
+      if (reqItem && /page|Page/.test(reqItem.url)) {
+        for (const r of capturedRequests) {
+          if (!r.responseBody) continue;
+          try {
+            const parsedR = JSON.parse(r.responseBody);
+            const d = parsedR && (parsedR.data || parsedR.result);
+            if (d && typeof d === 'object' && !Array.isArray(d)) {
+              if (Array.isArray(d.records)) { nestedListKey = 'records'; break; }
+              if (Array.isArray(d.list)) { nestedListKey = 'list'; break; }
+              if (Array.isArray(d.rows)) { nestedListKey = 'rows'; break; }
+            }
+          } catch {}
+        }
+      }
+      if (nestedListKey === 'records') {
+        res[targetKey] = { records: arr, total: arr.length, size: Math.max(10, arr.length), current: 1 };
+      } else if (nestedListKey === 'list') {
+        res[targetKey] = { list: arr, total: arr.length, pageNum: 1, pageSize: Math.max(10, arr.length) };
+      } else if (nestedListKey === 'rows') {
+        res[targetKey] = { rows: arr, total: arr.length };
+      } else {
+        res[targetKey] = arr;
+      }
     }
   }
   return res;
@@ -221,10 +307,10 @@ function emptyArraysInJson(node) {
     return curr;
   }
   const res = walk(node, 0);
-  // 若整个 JSON 内没有任何数组，但存在 data/result 字段，则将其置为 []
+  // 若整个 JSON 内没有任何数组，自动将 data/result 设为 []
   if (!foundArray && res && typeof res === 'object' && !Array.isArray(res)) {
-    if ('data' in res) res.data = [];
-    else if ('result' in res) res.result = [];
+    if ('result' in res) res.result = [];
+    else res.data = [];
   }
   return res;
 }

@@ -386,6 +386,15 @@
       .qm-btn-soft:hover {
         background: #dbeafe;
       }
+      .qm-btn-warn {
+        background: #fff7ed;
+        border-color: #fed7aa;
+        color: #ea580c;
+        font-weight: 600;
+      }
+      .qm-btn-warn:hover {
+        background: #ffedd5;
+      }
       .qm-textarea {
         flex: 1;
         width: 100%;
@@ -475,6 +484,7 @@
             </div>
             <div class="qm-row">
               <span class="qm-label" id="qmArrayCountLabel">数组扩充:</span>
+              <button id="qmEmptyBtn" class="qm-btn qm-btn-warn" title="将数组清空为 [] 并将 total 设为 0">置空数据</button>
               <button id="qmAdd1Btn" class="qm-btn qm-btn-soft">+1 条</button>
               <button id="qmAdd5Btn" class="qm-btn qm-btn-soft">+5 条</button>
               <button id="qmAdd10Btn" class="qm-btn qm-btn-soft">+10 条</button>
@@ -869,6 +879,7 @@
     const findInput = shadowRoot.getElementById('qmFindInput');
     const replaceInput = shadowRoot.getElementById('qmReplaceInput');
     const textarea = shadowRoot.getElementById('qmJsonTextarea');
+    const emptyBtn = shadowRoot.getElementById('qmEmptyBtn');
     const add1Btn = shadowRoot.getElementById('qmAdd1Btn');
     const add5Btn = shadowRoot.getElementById('qmAdd5Btn');
     const add10Btn = shadowRoot.getElementById('qmAdd10Btn');
@@ -895,9 +906,55 @@
       findInput.value = repStr;
     });
 
+    function emptyArraysInJson(node) {
+      let foundArray = false;
+      function walk(curr, depth) {
+        if (depth > 8 || curr === null || typeof curr !== 'object') return curr;
+        if (Array.isArray(curr)) {
+          foundArray = true;
+          return [];
+        }
+        Object.keys(curr).forEach((k) => {
+          const val = curr[k];
+          if (Array.isArray(val)) {
+            foundArray = true;
+            curr[k] = [];
+          } else if (typeof val === 'number' && /^(total|totalCount|count|totalElements|recordsTotal)$/i.test(k)) {
+            curr[k] = 0;
+          } else if (val && typeof val === 'object') {
+            curr[k] = walk(val, depth + 1);
+          }
+        });
+        return curr;
+      }
+      const res = walk(node, 0);
+      if (!foundArray && res && typeof res === 'object' && !Array.isArray(res)) {
+        if ('data' in res) res.data = [];
+        else if ('result' in res) res.result = [];
+      }
+      return res;
+    }
+
+    if (emptyBtn) {
+      emptyBtn.addEventListener('click', () => {
+        try {
+          const parsed = JSON.parse(textarea.value);
+          const emptied = emptyArraysInJson(parsed);
+          textarea.value = JSON.stringify(emptied, null, 2);
+          updateModalArrayLabel();
+        } catch (e) {
+          alert('JSON 语法错误，请检查引号或逗号：' + e.message);
+        }
+      });
+    }
+
     function addRowsInModal(count) {
       try {
-        const parsed = JSON.parse(textarea.value);
+        let sourceText = textarea.value;
+        if (countPrimaryArrayLength(sourceText) === 0 && currentEditingReq && currentEditingReq.originalBody) {
+          sourceText = currentEditingReq.originalBody;
+        }
+        const parsed = JSON.parse(sourceText);
         const expanded = expandArraysInJson(parsed, count);
         textarea.value = JSON.stringify(expanded, null, 2);
         updateModalArrayLabel();

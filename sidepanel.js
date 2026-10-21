@@ -147,6 +147,37 @@ function expandArraysInJson(node, addCount = 5, depth = 0) {
   return node;
 }
 
+// 一键置空接口数据（保留 code/status/msg 外壳，将所有数组清空为 []，将 total 设为 0）
+function emptyArraysInJson(node) {
+  let foundArray = false;
+  function walk(curr, depth) {
+    if (depth > 8 || curr === null || typeof curr !== 'object') return curr;
+    if (Array.isArray(curr)) {
+      foundArray = true;
+      return [];
+    }
+    Object.keys(curr).forEach((k) => {
+      const val = curr[k];
+      if (Array.isArray(val)) {
+        foundArray = true;
+        curr[k] = [];
+      } else if (typeof val === 'number' && /^(total|totalCount|count|totalElements|recordsTotal)$/i.test(k)) {
+        curr[k] = 0;
+      } else if (val && typeof val === 'object') {
+        curr[k] = walk(val, depth + 1);
+      }
+    });
+    return curr;
+  }
+  const res = walk(node, 0);
+  // 若整个 JSON 内没有任何数组，但存在 data/result 字段，则将其置为 []
+  if (!foundArray && res && typeof res === 'object' && !Array.isArray(res)) {
+    if ('data' in res) res.data = [];
+    else if ('result' in res) res.result = [];
+  }
+  return res;
+}
+
 function renderList() {
   const kw = searchInput.value.trim();
   clearSearchBtn.style.display = kw ? 'block' : 'none';
@@ -201,29 +232,53 @@ function renderList() {
         <span class="method-badge ${item.method}">${escapeHtml(item.method)}</span>
         <span class="url-text" title="${escapeHtml(item.url)}">${escapeHtml(getShortPath(item.url))}</span>
         ${mocked ? '<span class="status-pill">已改写</span>' : ''}
-        <button class="quick-plus-btn" title="免进详情：直接将该接口数组扩充5条并刷新网页">+5条数据</button>
+        <button class="quick-empty-btn" title="免进详情：直接将该接口数据置空并刷新网页">置空</button>
+        <button class="quick-plus-btn" title="免进详情：直接将该接口数组扩充5条并刷新网页">+5条</button>
       </div>
       <div class="card-preview">${oneLinePreview}</div>
       ${snippetHtml ? `<div class="match-box">${snippetHtml}</div>` : ''}
     `;
 
-    // 点击卡片右侧 [+5条数据] 按钮：一步完成扩充+保存+刷新页面
+    const quickEmptyBtn = card.querySelector('.quick-empty-btn');
+    quickEmptyBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      quickEmptyAndSave(item);
+    });
+
     const quickBtn = card.querySelector('.quick-plus-btn');
     quickBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       quickExpandAndSave(item, 5);
     });
 
-    // 点击卡片主体：进入全屏编辑页
     card.addEventListener('click', () => openDetailView(item));
     reqListEl.appendChild(card);
   });
 }
 
+function quickEmptyAndSave(item) {
+  try {
+    const savedRule = mockRules.find((r) => r.matchKey && item.url.includes(r.matchKey));
+    const sourceText = item.originalBody || (savedRule ? savedRule.mockBody : item.responseBody) || '';
+    const parsed = JSON.parse(sourceText);
+    const emptied = emptyArraysInJson(parsed);
+    const newBody = JSON.stringify(emptied, null, 2);
+    const matchKey = savedRule ? savedRule.matchKey : getDefaultMatchKey(item.url);
+
+    saveRuleAndReload(matchKey, newBody, item);
+  } catch (err) {
+    openDetailView(item);
+  }
+}
+
 function quickExpandAndSave(item, count) {
   try {
     const savedRule = mockRules.find((r) => r.matchKey && item.url.includes(r.matchKey));
-    const sourceText = savedRule ? savedRule.mockBody : (item.responseBody || '');
+    let sourceText = savedRule ? savedRule.mockBody : (item.responseBody || '');
+    // 如果之前被置空了（长度为0），自动基于原始数据扩充
+    if (countPrimaryArrayLength(sourceText) === 0 && item.originalBody) {
+      sourceText = item.originalBody;
+    }
     const parsed = JSON.parse(sourceText);
     const expanded = expandArraysInJson(parsed, count);
     const newBody = JSON.stringify(expanded, null, 2);
@@ -257,7 +312,11 @@ backToListBtn.addEventListener('click', () => {
 
 function handleAddRows(count) {
   try {
-    const parsed = JSON.parse(jsonEditor.value);
+    let sourceText = jsonEditor.value;
+    if (countPrimaryArrayLength(sourceText) === 0 && selectedReq && selectedReq.originalBody) {
+      sourceText = selectedReq.originalBody;
+    }
+    const parsed = JSON.parse(sourceText);
     const expanded = expandArraysInJson(parsed, count);
     jsonEditor.value = JSON.stringify(expanded, null, 2);
     updateArrayInfoLabel();
@@ -265,6 +324,21 @@ function handleAddRows(count) {
   } catch (e) {
     alert('JSON 格式有误，请先检查语法：' + e.message);
   }
+}
+
+const emptyDataBtn = document.getElementById('emptyDataBtn');
+if (emptyDataBtn) {
+  emptyDataBtn.addEventListener('click', () => {
+    try {
+      const parsed = JSON.parse(jsonEditor.value);
+      const emptied = emptyArraysInJson(parsed);
+      jsonEditor.value = JSON.stringify(emptied, null, 2);
+      updateArrayInfoLabel();
+      showToast('已将数据置空，点击下方保存即生效');
+    } catch (e) {
+      alert('JSON 格式有误，请先检查语法：' + e.message);
+    }
+  });
 }
 
 add1Btn.addEventListener('click', () => handleAddRows(1));

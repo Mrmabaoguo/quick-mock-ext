@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>QuickMock</title>
+  <style>
+    :root {
+      --bg-page: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --bg-code: #0f172a;
+      --border-light: #e2e8f0;
+      --border-hover: #cbd5e1;
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --text-muted: #94a3b8;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-soft: #eff6ff;
+      --success: #059669;
+      --success-soft: #ecfdf5;
+      --success-border: #a7f3d0;
+      --warn-soft: #fffbeb;
+      --warn-border: #fde68a;
+      --warn-text: #b45309;
+      --danger: #dc2626;
+      --radius-lg: 10px;
+      --radius-md: 7px;
+      --radius-sm: 5px;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 99px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-size: 13px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 视图容器：列表页与编辑页全高切换，告别上下挤压 */
+    .view {
+      display: none;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+    }
+    .view.active {
+      display: flex;
+    }
+
+    /* ================= 视图 1：接口列表页 ================= */
+    .top-bar {
+      background: var(--bg-card);
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .search-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .search-input-wrap {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 34px;
+      background: var(--bg-subtle);
+      border: 1px solid transparent;
+      color: var(--text-main);
+      padding: 0 28px 0 32px;
+      border-radius: var(--radius-md);
+      font-size: 12.5px;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .search-input:focus {
+      background: var(--bg-card);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .clear-search-btn {
+      position: absolute;
+      right: 8px;
+      width: 16px;
+      height: 16px;
+      border: none;
+      background: #cbd5e1;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 11px;
+      line-height: 16px;
+      text-align: center;
+      cursor: pointer;
+      display: none;
+    }
+
+    .btn {
+      height: 34px;
+      padding: 0 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-light);
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .btn:hover {
+      background: var(--bg-subtle);
+      border-color: var(--border-hover);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn svg {
+      width: 13px;
+      height: 13px;
+    }
+
+    .filter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11.5px;
+      color: var(--text-sub);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-subtle);
+      padding: 2px;
+      border-radius: 6px;
+    }
+
+    .tab-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-sub);
+      padding: 3px 9px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--text-main);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .text-link-danger {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .text-link-danger:hover {
+      color: var(--danger);
+    }
+
+    /* 列表滚动区（占满全屏剩余高度） */
+    .req-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .empty-state {
+      margin-top: 64px;
+      padding: 32px 20px;
+      text-align: center;
+      color: var(--text-sub);
+      background: var(--bg-card);
+      border: 1px dashed var(--border-hover);
+      border-radius: var(--radius-lg);
+    }
+
+    .empty-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .empty-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+
+    .req-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .req-card:hover {
+      border-color: #93c5fd;
+      box-shadow: var(--shadow-md);
+    }
+
+    .req-card.mocked {
+      background: #f0fdf4;
+      border-color: var(--success-border);
+    }
+
+    .card-row-1 {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .method-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      letter-spacing: 0.3px;
+    }
+
+    .method-badge.GET {
+      background: #eff6ff;
+      color: #2563eb;
+    }
+
+    .method-badge.POST {
+      background: #f0fdf4;
+      color: #16a34a;
+    }
+
+    .method-badge.PUT, .method-badge.DELETE {
+      background: #fff7ed;
+      color: #ea580c;
+    }
+
+    .url-text {
+      flex: 1;
+      font-weight: 600;
+      font-size: 12.5px;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .status-pill {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 99px;
+      background: var(--success);
+      color: #fff;
+    }
+
+    .quick-plus-btn {
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 5px;
+      border: 1px solid #bfdbfe;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.12s;
+      flex-shrink: 0;
+    }
+
+    .quick-plus-btn:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .card-preview {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .match-box {
+      padding: 5px 8px;
+      background: var(--warn-soft);
+      border: 1px solid var(--warn-border);
+      border-radius: var(--radius-sm);
+      color: #78350f;
+      font-size: 11.5px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      word-break: break-all;
+      line-height: 1.45;
+    }
+
+    .match-mark {
+      background: #fde047;
+      color: #0f172a;
+      font-weight: 700;
+      padding: 0 3px;
+      border-radius: 2px;
+    }
+
+    /* ================= 视图 2：全高沉浸式编辑页 ================= */
+    .detail-header {
+      background: var(--bg-card);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .back-btn {
+      height: 30px;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .detail-url-bar {
+      background: var(--bg-card);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .input-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-sub);
+      white-space: nowrap;
+    }
+
+    .path-input {
+      flex: 1;
+      height: 30px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 0 9px;
+      font-size: 12px;
+      color: var(--text-main);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      outline: none;
+    }
+
+    .path-input:focus {
+      background: var(--bg-card);
+      border-color: var(--primary);
+    }
+
+    .quick-tools {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-sm {
+      height: 28px;
+      padding: 0 10px;
+      font-size: 11.5px;
+      border-radius: var(--radius-sm);
+    }
+
+    .btn-accent {
+      background: var(--primary-soft);
+      border-color: #bfdbfe;
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .btn-accent:hover {
+      background: #dbeafe;
+      border-color: #93c5fd;
+    }
+
+    .editor-container {
+      flex: 1;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .json-textarea {
+      flex: 1;
+      width: 100%;
+      background: var(--bg-card);
+      color: #0f172a;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      resize: none;
+      outline: none;
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+    }
+
+    .json-textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .detail-footer {
+      background: var(--bg-card);
+      padding: 10px 14px;
+      border-top: 1px solid var(--border-light);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn-primary {
+      flex: 1;
+      height: 38px;
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    /* 顶部轻提示 */
+    .toast-banner {
+      position: fixed;
+      bottom: 58px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0f172a;
+      color: #ffffff;
+      padding: 7px 14px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 100;
+    }
+
+    .toast-banner.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <!-- 视图 1：全屏接口列表页 -->
+  <div id="listView" class="view active">
+    <div class="top-bar">
+      <div class="search-group">
+        <div class="search-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            id="searchInput"
+            class="search-input"
+            type="text"
+            placeholder="搜页面文字(如姓名/ID)或接口路径..."
+          />
+          <button id="clearSearchBtn" class="clear-search-btn" title="清空搜索">×</button>
+        </div>
+        <button id="reloadPageBtn" class="btn" title="刷新网页重新捕获接口">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          刷新页面
+        </button>
+      </div>
+
+      <div class="filter-bar">
+        <div class="tabs">
+          <button id="tabAll" class="tab-btn active">全部 (<span id="countAll">0</span>)</button>
+          <button id="tabMocked" class="tab-btn">已改写 (<span id="countMocked">0</span>)</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button
+            id="hotkeyRecordBtn"
+            style="height:24px;border:1px solid var(--border-light);border-radius:5px;font-size:11px;padding:0 8px;background:var(--bg-card);color:var(--text-main);cursor:pointer;font-weight:500;"
+            title="点击后按键盘任意键即可修改长按触发键"
+          >
+            长按键: Shift (点击修改)
+          </button>
+          <button id="clearRulesBtn" class="text-link-danger">重置改写</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="reqList" class="req-list"></div>
+  </div>
+
+  <!-- 视图 2：全屏详情编辑页（告别上下分屏挤压） -->
+  <div id="detailView" class="view">
+    <div class="detail-header">
+      <button id="backToListBtn" class="btn back-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        返回列表
+      </button>
+      <button id="restoreOrigBtn" class="btn btn-sm">恢复原始数据</button>
+    </div>
+
+    <div class="detail-url-bar">
+      <div class="input-row">
+        <span class="input-label">匹配路径</span>
+        <input id="matchKeyInput" class="path-input" type="text" />
+      </div>
+      <div class="quick-tools">
+        <span class="input-label" id="arrayInfoText">快速造数（自动识别数组）</span>
+        <div class="tool-group">
+          <button id="add1Btn" class="btn btn-sm btn-accent">+1 条</button>
+          <button id="add5Btn" class="btn btn-sm btn-accent">+5 条</button>
+          <button id="add10Btn" class="btn btn-sm btn-accent">+10 条</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="editor-container">
+      <textarea id="jsonEditor" class="json-textarea" spellcheck="false"></textarea>
+    </div>
+
+    <div class="detail-footer">
+      <button id="saveMockBtn" class="btn btn-primary">保存修改并刷新页面生效</button>
+    </div>
+  </div>
+
+  <div id="toastBanner" class="toast-banner">已保存并刷新页面</div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

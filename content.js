@@ -230,8 +230,8 @@
         display: flex;
       }
       .qm-modal {
-        width: 740px;
-        max-width: 92vw;
+        width: 780px;
+        max-width: 94vw;
         height: 600px;
         max-height: 88vh;
         background: #ffffff;
@@ -331,8 +331,8 @@
       .qm-row {
         display: flex;
         align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
+        gap: 6px;
+        flex-shrink: 0;
       }
       .qm-api-select {
         flex: 1;
@@ -343,22 +343,21 @@
         background: #f8fafc;
         border: 1px solid #e2e8f0;
         border-radius: 8px;
-        padding: 8px 10px;
+        padding: 8px 12px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
+        gap: 8px 14px;
         flex-wrap: wrap;
       }
       .qm-replace-group {
         display: flex;
         align-items: center;
         gap: 6px;
-        flex: 1;
-        min-width: 260px;
+        flex-shrink: 0;
       }
       .qm-input-sm {
-        width: 125px;
+        width: 100px;
         height: 28px;
       }
       .qm-btn {

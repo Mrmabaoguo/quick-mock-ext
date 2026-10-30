@@ -638,10 +638,56 @@
       background: #e2e8f0;
     }
 
+    .raw-editor-wrap {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      display: none;
+    }
+
+    .raw-editor-wrap.active {
+      display: flex;
+    }
+
+    .raw-highlight-layer {
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      padding: 12px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-md);
+      font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow: hidden;
+      pointer-events: none;
+      color: transparent;
+      z-index: 1;
+    }
+
+    .raw-highlight-layer mark.raw-hit {
+      background: #fef08a;
+      color: transparent;
+      border-radius: 2px;
+      box-shadow: 0 0 0 1px #facc15;
+    }
+
+    .raw-highlight-layer mark.raw-hit-active {
+      background: #fb923c;
+      color: transparent;
+      border-radius: 2px;
+      box-shadow: 0 0 0 2px #ea580c;
+    }
+
     .json-textarea {
       flex: 1;
       width: 100%;
-      background: var(--bg-card);
+      background: transparent;
       color: #0f172a;
       border: 1px solid var(--border-light);
       border-radius: var(--radius-md);
@@ -649,13 +695,13 @@
       font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
       font-size: 12px;
       line-height: 1.55;
+      white-space: pre-wrap;
+      word-wrap: break-word;
       resize: none;
       outline: none;
       box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
-      display: none;
-    }
-
-    .json-textarea.active {
+      position: relative;
+      z-index: 2;
       display: block;
     }
 
@@ -1159,7 +1205,10 @@
         <button id="jsonSearchCloseBtn" class="search-nav-btn" title="关闭搜索 (Esc)">×</button>
       </div>
 
-      <textarea id="jsonEditor" class="json-textarea active" spellcheck="false"></textarea>
+      <div id="rawEditorWrap" class="raw-editor-wrap active">
+        <pre id="rawHighlightLayer" class="raw-highlight-layer" aria-hidden="true"></pre>
+        <textarea id="jsonEditor" class="json-textarea active" spellcheck="false"></textarea>
+      </div>
       <div id="jsonTreeView" class="json-tree-view"></div>
     </div>
 

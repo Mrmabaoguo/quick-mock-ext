@@ -404,7 +404,25 @@ function buildLongStringOfLength(origVal, fallbackKey, targetLen) {
   return out.slice(0, len);
 }
 
-// 一键将接口内的展示型文本按指定字符个数扩充（跳过 id/code/status/type/日期/URL 等逻辑字段，防止页面报错）
+function buildLongNumberOfLength(origVal, targetLen) {
+  const len = Math.max(1, Math.min(10000, Math.round(Number(targetLen) || 100)));
+  const baseStr = String(origVal ?? '9').replace(/[^0-9.]/g, '') || '9';
+  let out = baseStr;
+  while (out.length < len) {
+    out += '9876543210';
+  }
+  out = out.slice(0, len);
+  if (out.endsWith('.')) {
+    out = out.slice(0, -1) + '9';
+  }
+  if (len <= 15) {
+    const num = Number(out);
+    if (Number.isFinite(num)) return num;
+  }
+  return out;
+}
+
+// 一键将接口内的展示型文本与数值均按指定字符个数扩充（跳过 id/code/status/type/日期/URL 等逻辑字段，防止页面报错）
 function lengthenDataInJson(rootNode, reqItem = null, customLen = null) {
   const targetCharLen = customLen && Number(customLen) > 0 ? Number(customLen) : getCustomLongLength();
   let baseNode = rootNode;
@@ -431,13 +449,17 @@ function lengthenDataInJson(rootNode, reqItem = null, customLen = null) {
           /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(val) ||
           /^\d{2}:\d{2}/.test(val) ||
           /^https?:\/\//i.test(val) ||
-          /^(true|false|null|\d+)$/i.test(val)
+          /^(true|false|null)$/i.test(val)
         ) {
           return;
         }
-        curr[k] = buildLongStringOfLength(val, k, targetCharLen);
+        if (/^-?\d+(\.\d+)?$/.test(val)) {
+          curr[k] = buildLongNumberOfLength(val, targetCharLen);
+        } else {
+          curr[k] = buildLongStringOfLength(val, k, targetCharLen);
+        }
       } else if (typeof val === 'number') {
-        curr[k] = Number.isInteger(val) ? 99999999 : 99999999.88;
+        curr[k] = buildLongNumberOfLength(val, targetCharLen);
       } else if (val && typeof val === 'object') {
         curr[k] = walk(val, depth + 1);
       }
@@ -695,6 +717,8 @@ function quickExpandAndSave(item, count) {
   }
 }
 
+const rawEditorWrap = document.getElementById('rawEditorWrap');
+const rawHighlightLayer = document.getElementById('rawHighlightLayer');
 const jsonTreeView = document.getElementById('jsonTreeView');
 const modeTreeBtn = document.getElementById('modeTreeBtn');
 const modeRawBtn = document.getElementById('modeRawBtn');
@@ -719,14 +743,14 @@ function setEditorMode(mode) {
     modeTreeBtn.classList.add('active');
     modeRawBtn.classList.remove('active');
     jsonTreeView.classList.add('active');
-    jsonEditor.classList.remove('active');
+    if (rawEditorWrap) rawEditorWrap.classList.remove('active');
     expandAllBtn.style.display = '';
     collapseAllBtn.style.display = '';
     renderJsonTree();
   } else {
     modeRawBtn.classList.add('active');
     modeTreeBtn.classList.remove('active');
-    jsonEditor.classList.add('active');
+    if (rawEditorWrap) rawEditorWrap.classList.add('active');
     jsonTreeView.classList.remove('active');
     expandAllBtn.style.display = 'none';
     collapseAllBtn.style.display = 'none';
@@ -735,6 +759,21 @@ function setEditorMode(mode) {
     performJsonSearch(false);
   }
 }
+
+jsonEditor.addEventListener('scroll', () => {
+  if (rawHighlightLayer) {
+    rawHighlightLayer.scrollTop = jsonEditor.scrollTop;
+    rawHighlightLayer.scrollLeft = jsonEditor.scrollLeft;
+  }
+});
+
+jsonEditor.addEventListener('input', () => {
+  if (jsonSearchBar.classList.contains('open') && jsonSearchInput.value.trim()) {
+    performJsonSearch(false);
+  } else if (rawHighlightLayer) {
+    rawHighlightLayer.innerHTML = '';
+  }
+});
 
 if (modeTreeBtn) modeTreeBtn.addEventListener('click', () => setEditorMode('tree'));
 if (modeRawBtn) modeRawBtn.addEventListener('click', () => setEditorMode('raw'));
@@ -1000,6 +1039,9 @@ function syncEditorAndTree(newJsonStr) {
   if (currentEditorMode === 'tree') {
     renderJsonTree();
   }
+  if (jsonSearchBar && jsonSearchBar.classList.contains('open') && jsonSearchInput.value.trim()) {
+    performJsonSearch(false);
+  }
 }
 
 if (expandAllBtn) {
@@ -1052,10 +1094,50 @@ function closeSearchBar() {
 }
 
 function clearTreeHighlights() {
-  if (!jsonTreeView) return;
-  jsonTreeView.querySelectorAll('.jt-hit, .jt-hit-active').forEach((el) => {
-    el.classList.remove('jt-hit', 'jt-hit-active');
+  if (jsonTreeView) {
+    jsonTreeView.querySelectorAll('.jt-hit, .jt-hit-active').forEach((el) => {
+      el.classList.remove('jt-hit', 'jt-hit-active');
+    });
+  }
+  if (rawHighlightLayer) {
+    rawHighlightLayer.innerHTML = '';
+  }
+}
+
+function renderRawLayerHighlights(scrollToMatch = true) {
+  if (!rawHighlightLayer) return;
+  const kw = jsonSearchInput.value.trim();
+  if (!kw || searchMatches.length === 0 || currentEditorMode !== 'raw') {
+    rawHighlightLayer.innerHTML = '';
+    return;
+  }
+  const src = jsonEditor.value;
+  const kwLen = kw.length;
+  let html = '';
+  let lastPos = 0;
+  searchMatches.forEach((matchIdx, i) => {
+    html += escapeHtml(src.slice(lastPos, matchIdx));
+    const matchedText = escapeHtml(src.slice(matchIdx, matchIdx + kwLen));
+    if (i === currentMatchIndex) {
+      html += `<mark class="raw-hit-active" id="activeRawMark">${matchedText}</mark>`;
+    } else {
+      html += `<mark class="raw-hit">${matchedText}</mark>`;
+    }
+    lastPos = matchIdx + kwLen;
   });
+  html += escapeHtml(src.slice(lastPos)) + '\n';
+  rawHighlightLayer.innerHTML = html;
+  rawHighlightLayer.scrollTop = jsonEditor.scrollTop;
+  rawHighlightLayer.scrollLeft = jsonEditor.scrollLeft;
+
+  if (scrollToMatch) {
+    const activeMark = document.getElementById('activeRawMark');
+    if (activeMark) {
+      const targetTop = Math.max(0, activeMark.offsetTop - jsonEditor.clientHeight / 2 + 12);
+      jsonEditor.scrollTop = targetTop;
+      rawHighlightLayer.scrollTop = targetTop;
+    }
+  }
 }
 
 function performJsonSearch(scrollToMatch = true) {
@@ -1128,12 +1210,7 @@ function highlightCurrentMatch(scrollToMatch = true) {
       targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   } else {
-    const kwLen = jsonSearchInput.value.trim().length;
-    const startIdx = searchMatches[currentMatchIndex];
-    if (scrollToMatch) {
-      const linesBefore = jsonEditor.value.slice(0, startIdx).split('\n').length;
-      jsonEditor.scrollTop = Math.max(0, (linesBefore - 5) * 19);
-    }
+    renderRawLayerHighlights(scrollToMatch);
   }
 }
 

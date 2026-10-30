@@ -408,6 +408,7 @@
         align-items: center;
         gap: 6px;
         flex-shrink: 0;
+        flex-wrap: wrap;
       }
       .qm-api-select {
         flex: 1;
@@ -421,8 +422,8 @@
         padding: 8px 12px;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 8px 14px;
+        justify-content: flex-start;
+        gap: 8px 12px;
         flex-wrap: wrap;
       }
       .qm-replace-group {
@@ -469,10 +470,51 @@
       .qm-btn-warn:hover {
         background: #ffedd5;
       }
+      .qm-raw-wrap {
+        position: relative;
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        background: #ffffff;
+        border-radius: 8px;
+        display: none;
+      }
+      .qm-raw-wrap.active {
+        display: flex;
+      }
+      .qm-raw-highlight {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
+        font-size: 12.5px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        overflow: hidden;
+        pointer-events: none;
+        color: transparent;
+        z-index: 1;
+      }
+      .qm-raw-highlight mark.raw-hit {
+        background: #fef08a;
+        color: transparent;
+        border-radius: 2px;
+        box-shadow: 0 0 0 1px #facc15;
+      }
+      .qm-raw-highlight mark.raw-hit-active {
+        background: #fb923c;
+        color: transparent;
+        border-radius: 2px;
+        box-shadow: 0 0 0 2px #ea580c;
+      }
       .qm-textarea {
         flex: 1;
         width: 100%;
-        background: #ffffff;
+        background: transparent;
         color: #0f172a;
         border: 1px solid #cbd5e1;
         border-radius: 8px;
@@ -480,11 +522,12 @@
         font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
         font-size: 12.5px;
         line-height: 1.55;
+        white-space: pre-wrap;
+        word-wrap: break-word;
         resize: none;
         outline: none;
-        display: none;
-      }
-      .qm-textarea.active {
+        position: relative;
+        z-index: 2;
         display: block;
       }
       .qm-textarea:focus {
@@ -750,7 +793,10 @@
             <button id="qmSearchCloseBtn" class="qm-btn">×</button>
           </div>
 
-          <textarea id="qmJsonTextarea" class="qm-textarea active" spellcheck="false"></textarea>
+          <div id="qmRawWrap" class="qm-raw-wrap active">
+            <pre id="qmRawHighlight" class="qm-raw-highlight" aria-hidden="true"></pre>
+            <textarea id="qmJsonTextarea" class="qm-textarea active" spellcheck="false"></textarea>
+          </div>
           <div id="qmTreeView" class="qm-tree-view"></div>
         </div>
 
@@ -1392,9 +1438,14 @@
 
   function syncModalEditorAndTree(jsonStr) {
     const textarea = shadowRoot.getElementById('qmJsonTextarea');
+    const searchBar = shadowRoot.getElementById('qmSearchBar');
     textarea.value = jsonStr;
     updateModalArrayLabel();
     if (modalEditorMode === 'tree') renderModalTree();
+    if (searchBar && searchBar.classList.contains('open')) {
+      const searchInput = shadowRoot.getElementById('qmSearchInput');
+      if (searchInput) searchInput.dispatchEvent(new Event('input'));
+    }
   }
 
   function selectRequestInModal(req, highlightWord) {
@@ -1464,6 +1515,8 @@
     const findInput = shadowRoot.getElementById('qmFindInput');
     const replaceInput = shadowRoot.getElementById('qmReplaceInput');
     const textarea = shadowRoot.getElementById('qmJsonTextarea');
+    const rawWrap = shadowRoot.getElementById('qmRawWrap');
+    const rawHighlight = shadowRoot.getElementById('qmRawHighlight');
     const treeView = shadowRoot.getElementById('qmTreeView');
     const modeTreeBtn = shadowRoot.getElementById('qmModeTreeBtn');
     const modeRawBtn = shadowRoot.getElementById('qmModeRawBtn');
@@ -1498,19 +1551,39 @@
       modeTreeBtn.classList.add('active');
       modeRawBtn.classList.remove('active');
       treeView.classList.add('active');
-      textarea.classList.remove('active');
+      if (rawWrap) rawWrap.classList.remove('active');
       expandAllBtn.style.display = '';
       collapseAllBtn.style.display = '';
       renderModalTree();
+      if (searchBar.classList.contains('open') && searchInput.value.trim()) {
+        runModalSearch();
+      }
     });
     modeRawBtn.addEventListener('click', () => {
       modalEditorMode = 'raw';
       modeRawBtn.classList.add('active');
       modeTreeBtn.classList.remove('active');
-      textarea.classList.add('active');
+      if (rawWrap) rawWrap.classList.add('active');
       treeView.classList.remove('active');
       expandAllBtn.style.display = 'none';
       collapseAllBtn.style.display = 'none';
+      if (searchBar.classList.contains('open') && searchInput.value.trim()) {
+        runModalSearch();
+      }
+    });
+
+    textarea.addEventListener('scroll', () => {
+      if (rawHighlight) {
+        rawHighlight.scrollTop = textarea.scrollTop;
+        rawHighlight.scrollLeft = textarea.scrollLeft;
+      }
+    });
+    textarea.addEventListener('input', () => {
+      if (searchBar.classList.contains('open') && searchInput.value.trim()) {
+        runModalSearch(false);
+      } else if (rawHighlight) {
+        rawHighlight.innerHTML = '';
+      }
     });
 
     expandAllBtn.addEventListener('click', () => {
@@ -1531,56 +1604,119 @@
       });
     });
 
-    function runModalSearch() {
+    function escapeRawHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function renderRawHighlights(scrollToActive = true) {
+      if (!rawHighlight) return;
+      const kw = searchInput.value.trim();
+      if (!kw || modalSearchMatches.length === 0 || modalEditorMode !== 'raw') {
+        rawHighlight.innerHTML = '';
+        return;
+      }
+      const src = textarea.value;
+      const kwLen = kw.length;
+      let html = '';
+      let lastPos = 0;
+      modalSearchMatches.forEach((matchIdx, i) => {
+        html += escapeRawHtml(src.slice(lastPos, matchIdx));
+        const matchedText = escapeRawHtml(src.slice(matchIdx, matchIdx + kwLen));
+        if (i === modalMatchIndex) {
+          html += `<mark class="raw-hit-active" id="qmActiveRawMark">${matchedText}</mark>`;
+        } else {
+          html += `<mark class="raw-hit">${matchedText}</mark>`;
+        }
+        lastPos = matchIdx + kwLen;
+      });
+      html += escapeRawHtml(src.slice(lastPos)) + '\n';
+      rawHighlight.innerHTML = html;
+      rawHighlight.scrollTop = textarea.scrollTop;
+      rawHighlight.scrollLeft = textarea.scrollLeft;
+
+      if (scrollToActive) {
+        const activeMark = shadowRoot.getElementById('qmActiveRawMark');
+        if (activeMark) {
+          const targetTop = Math.max(0, activeMark.offsetTop - textarea.clientHeight / 2 + 12);
+          textarea.scrollTop = targetTop;
+          rawHighlight.scrollTop = targetTop;
+        }
+      }
+    }
+
+    function runModalSearch(scrollToActive = true) {
       const kw = searchInput.value.trim().toLowerCase();
       treeView.querySelectorAll('.jt-hit, .jt-hit-active').forEach((el) => el.classList.remove('jt-hit', 'jt-hit-active'));
+      if (rawHighlight) rawHighlight.innerHTML = '';
       modalSearchMatches = [];
       modalMatchIndex = -1;
       if (!kw) {
         searchCount.textContent = '0/0';
         return;
       }
-      treeView.querySelectorAll('.jt-key, .jt-val').forEach((el) => {
-        if ((el.textContent || '').toLowerCase().includes(kw)) {
-          el.classList.add('jt-hit');
-          modalSearchMatches.push(el);
-          let p = el.parentElement;
-          while (p && p !== treeView) {
-            if (p.classList.contains('jt-node') && p.classList.contains('collapsed')) {
-              p.classList.remove('collapsed');
-              const t = p.querySelector(':scope > .jt-line > .jt-toggle');
-              if (t && t.textContent) t.textContent = '▼';
+      if (modalEditorMode === 'tree') {
+        treeView.querySelectorAll('.jt-key, .jt-val').forEach((el) => {
+          if ((el.textContent || '').toLowerCase().includes(kw)) {
+            el.classList.add('jt-hit');
+            modalSearchMatches.push(el);
+            let p = el.parentElement;
+            while (p && p !== treeView) {
+              if (p.classList.contains('jt-node') && p.classList.contains('collapsed')) {
+                p.classList.remove('collapsed');
+                const t = p.querySelector(':scope > .jt-line > .jt-toggle');
+                if (t && t.textContent) t.textContent = '▼';
+              }
+              p = p.parentElement;
             }
-            p = p.parentElement;
           }
+        });
+      } else {
+        const lowerText = textarea.value.toLowerCase();
+        let pos = 0;
+        while (pos < lowerText.length) {
+          const idx = lowerText.indexOf(kw, pos);
+          if (idx === -1) break;
+          modalSearchMatches.push(idx);
+          pos = idx + kw.length;
         }
-      });
+      }
       if (modalSearchMatches.length > 0) {
         modalMatchIndex = 0;
-        focusModalMatch();
+        focusModalMatch(scrollToActive);
       } else {
         searchCount.textContent = '0/0';
       }
     }
 
-    function focusModalMatch() {
+    function focusModalMatch(scrollToActive = true) {
       if (modalSearchMatches.length === 0) return;
       searchCount.textContent = `${modalMatchIndex + 1}/${modalSearchMatches.length}`;
-      modalSearchMatches.forEach((el, i) => el.classList.toggle('jt-hit-active', i === modalMatchIndex));
-      modalSearchMatches[modalMatchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (modalEditorMode === 'tree') {
+        modalSearchMatches.forEach((el, i) => el.classList.toggle('jt-hit-active', i === modalMatchIndex));
+        if (scrollToActive) {
+          modalSearchMatches[modalMatchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      } else {
+        renderRawHighlights(scrollToActive);
+      }
     }
 
     openSearchBtn.addEventListener('click', () => {
       searchBar.classList.add('open');
       searchInput.focus();
       searchInput.select();
+      if (searchInput.value.trim()) runModalSearch(true);
     });
     searchCloseBtn.addEventListener('click', () => {
       searchBar.classList.remove('open');
       treeView.querySelectorAll('.jt-hit, .jt-hit-active').forEach((el) => el.classList.remove('jt-hit', 'jt-hit-active'));
+      if (rawHighlight) rawHighlight.innerHTML = '';
       searchCount.textContent = '0/0';
     });
-    searchInput.addEventListener('input', runModalSearch);
+    searchInput.addEventListener('input', () => runModalSearch(true));
     searchPrevBtn.addEventListener('click', () => {
       if (modalSearchMatches.length > 0) {
         modalMatchIndex = (modalMatchIndex - 1 + modalSearchMatches.length) % modalSearchMatches.length;
@@ -1674,6 +1810,24 @@
       return out.slice(0, len);
     }
 
+    function buildModalLongNumber(origVal, targetLen) {
+      const len = Math.max(1, Math.min(10000, Math.round(Number(targetLen) || 100)));
+      const baseStr = String(origVal ?? '9').replace(/[^0-9.]/g, '') || '9';
+      let out = baseStr;
+      while (out.length < len) {
+        out += '9876543210';
+      }
+      out = out.slice(0, len);
+      if (out.endsWith('.')) {
+        out = out.slice(0, -1) + '9';
+      }
+      if (len <= 15) {
+        const num = Number(out);
+        if (Number.isFinite(num)) return num;
+      }
+      return out;
+    }
+
     function lengthenDataInJson(rootNode, customLen) {
       let baseNode = rootNode;
       if (countPrimaryArrayLength(JSON.stringify(baseNode)) <= 0) {
@@ -1703,13 +1857,17 @@
               /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(val) ||
               /^\d{2}:\d{2}/.test(val) ||
               /^https?:\/\//i.test(val) ||
-              /^(true|false|null|\d+)$/i.test(val)
+              /^(true|false|null)$/i.test(val)
             ) {
               return;
             }
-            curr[k] = buildModalLongString(val, k, targetCharLen);
+            if (/^-?\d+(\.\d+)?$/.test(val)) {
+              curr[k] = buildModalLongNumber(val, targetCharLen);
+            } else {
+              curr[k] = buildModalLongString(val, k, targetCharLen);
+            }
           } else if (typeof val === 'number') {
-            curr[k] = Number.isInteger(val) ? 99999999 : 99999999.88;
+            curr[k] = buildModalLongNumber(val, targetCharLen);
           } else if (val && typeof val === 'object') {
             curr[k] = walk(val, depth + 1);
           }

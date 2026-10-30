@@ -64,6 +64,14 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    html.mode-popup,
+    html.mode-popup body {
+      width: 740px;
+      min-width: 740px;
+      height: 580px;
+      min-height: 580px;
+    }
+
     /* 视图容器：列表页与编辑页全高切换，告别上下挤压 */
     .view {
       display: none;
@@ -943,9 +951,19 @@
           <span id="powerDot" class="status-dot"></span>
           <span id="powerStatusLabel">插件运行中</span>
         </div>
-        <button id="powerToggleBtn" class="power-toggle-btn" title="点击一键开启或关闭插件拦截与点选功能">
-          <span id="powerBtnText">已开启 (点击关闭)</span>
-        </button>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button
+            id="displayModeToggleBtn"
+            class="power-toggle-btn"
+            style="border-color:var(--border-light);background:var(--bg-subtle);color:var(--text-main);"
+            title="点击切换右上角插件图标打开方式：右上角悬浮窗 / 右侧边栏"
+          >
+            <span id="displayModeBtnText">🪟 悬浮窗模式 (点击切侧边栏)</span>
+          </button>
+          <button id="powerToggleBtn" class="power-toggle-btn" title="点击一键开启或关闭插件拦截与点选功能">
+            <span id="powerBtnText">已开启 (点击关闭)</span>
+          </button>
+        </div>
       </div>
 
       <div class="search-group">
@@ -1023,23 +1041,29 @@
             </button>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;">超长字符</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;">超长扩充至</span>
           <input
             id="batchLongTextInput"
-            type="text"
-            placeholder="留空用默认60字超长串，或输入指定超长内容..."
-            style="flex:1;min-width:60px;height:24px;padding:0 6px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;"
+            type="number"
+            min="1"
+            max="10000"
+            value="100"
+            title="一键超长时将文本字段扩充到的目标字符个数（默认 100 个字符）"
+            style="width:62px;height:24px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;text-align:center;"
           />
-          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;">超多条数</span>
+          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">个字符</span>
+          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;margin-left:6px;">超多扩充至</span>
           <input
             id="batchManyCountInput"
             type="number"
             min="1"
             max="5000"
             value="50"
-            style="width:54px;height:24px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;text-align:center;"
+            title="一键超多时每个接口扩充的数据条数（默认 50 条）"
+            style="width:56px;height:24px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;text-align:center;"
           />
+          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">条数据</span>
         </div>
       </div>
     </div>
@@ -1076,14 +1100,18 @@
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-        <span class="input-label" style="font-size:11px;">指定超长</span>
+        <span class="input-label" style="font-size:11px;">超长扩充至</span>
         <input
           id="detailLongTextInput"
-          type="text"
-          placeholder="留空用默认超长串，或输入指定超长字符..."
-          style="flex:1;min-width:80px;height:26px;padding:0 7px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;"
+          type="number"
+          min="1"
+          max="10000"
+          value="100"
+          title="将文本字段扩充到的目标字符个数（默认 100 个字符）"
+          style="width:66px;height:26px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;text-align:center;"
         />
-        <span class="input-label" style="font-size:11px;">超多条数</span>
+        <span style="font-size:11px;color:var(--text-muted);">个字符</span>
+        <span class="input-label" style="font-size:11px;margin-left:6px;">超多条数</span>
         <input
           id="detailManyCountInput"
           type="number"

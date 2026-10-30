@@ -18,7 +18,8 @@
     "default_path": "sidepanel.html"
   },
   "action": {
-    "default_title": "打开 QuickMock 侧边栏"
+    "default_title": "打开 QuickMock (支持右上角悬浮窗 / 侧边栏)",
+    "default_popup": "sidepanel.html?mode=popup"
   },
   "content_scripts": [
     {

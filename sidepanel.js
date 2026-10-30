@@ -1,3 +1,7 @@
+if (location.search.includes('mode=popup')) {
+  document.documentElement.classList.add('mode-popup');
+}
+
 let capturedRequests = [];
 let mockRules = [];
 let selectedReq = null;
@@ -322,9 +326,9 @@ const detailManyCountInput = document.getElementById('detailManyCountInput');
 const batchManyBtn = document.getElementById('batchManyBtn');
 const addCustomCountBtn = document.getElementById('addCustomCountBtn');
 
-// 初始化并双向同步「指定超长字符」与「超多条数」配置
+// 初始化并双向同步「超长字符个数」与「超多条数」配置
 (function initCustomStressConfig() {
-  const savedLong = localStorage.getItem('__QM_CUSTOM_LONG_TEXT__') || '';
+  const savedLong = localStorage.getItem('__QM_CUSTOM_LONG_LEN__') || '100';
   const savedMany = localStorage.getItem('__QM_CUSTOM_MANY_COUNT__') || '50';
   if (batchLongTextInput) batchLongTextInput.value = savedLong;
   if (detailLongTextInput) detailLongTextInput.value = savedLong;
@@ -335,14 +339,14 @@ const addCustomCountBtn = document.getElementById('addCustomCountBtn');
     batchLongTextInput.addEventListener('input', () => {
       const v = batchLongTextInput.value;
       if (detailLongTextInput) detailLongTextInput.value = v;
-      localStorage.setItem('__QM_CUSTOM_LONG_TEXT__', v);
+      localStorage.setItem('__QM_CUSTOM_LONG_LEN__', v);
     });
   }
   if (detailLongTextInput) {
     detailLongTextInput.addEventListener('input', () => {
       const v = detailLongTextInput.value;
       if (batchLongTextInput) batchLongTextInput.value = v;
-      localStorage.setItem('__QM_CUSTOM_LONG_TEXT__', v);
+      localStorage.setItem('__QM_CUSTOM_LONG_LEN__', v);
     });
   }
   if (batchManyCountInput) {
@@ -361,13 +365,14 @@ const addCustomCountBtn = document.getElementById('addCustomCountBtn');
   }
 })();
 
-function getCustomLongString() {
-  const raw = (
+function getCustomLongLength() {
+  const raw = Number(
     (batchLongTextInput && batchLongTextInput.value) ||
-    (detailLongTextInput && detailLongTextInput.value) ||
-    ''
-  ).trim();
-  return raw;
+      (detailLongTextInput && detailLongTextInput.value) ||
+      100
+  );
+  if (!Number.isFinite(raw) || raw < 1) return 100;
+  return Math.min(Math.round(raw), 10000);
 }
 
 function getCustomManyCount() {
@@ -380,9 +385,26 @@ function getCustomManyCount() {
   return Math.min(Math.round(raw), 5000);
 }
 
-// 一键将接口内的展示型文本与数值拉长（跳过 id/code/status/type/日期/URL 等逻辑字段，防止页面报错）
-function lengthenDataInJson(rootNode, reqItem = null, customStr = '') {
-  const userLongStr = (customStr !== undefined && customStr !== '' ? customStr : getCustomLongString()).trim();
+function buildLongStringOfLength(origVal, fallbackKey, targetLen) {
+  const len = Math.max(1, Math.min(10000, Math.round(Number(targetLen) || 100)));
+  const cleanOrig =
+    String(origVal || '')
+      .replace(/^【\d+字】/, '')
+      .replace(/^【超长测试】/, '')
+      .split('_超长填充')[0]
+      .slice(0, 16) || String(fallbackKey || '测试');
+  const prefix = len >= 8 ? `【${len}字】${cleanOrig}` : cleanOrig;
+  const padUnit = `_超长填充_${cleanOrig}_1234567890`;
+  let out = prefix;
+  while (out.length < len) {
+    out += padUnit;
+  }
+  return out.slice(0, len);
+}
+
+// 一键将接口内的展示型文本按指定字符个数扩充（跳过 id/code/status/type/日期/URL 等逻辑字段，防止页面报错）
+function lengthenDataInJson(rootNode, reqItem = null, customLen = null) {
+  const targetCharLen = customLen && Number(customLen) > 0 ? Number(customLen) : getCustomLongLength();
   let baseNode = rootNode;
   if (countPrimaryArrayLength(JSON.stringify(baseNode)) <= 0) {
     baseNode = expandArraysInJson(baseNode, 5, reqItem);
@@ -411,12 +433,7 @@ function lengthenDataInJson(rootNode, reqItem = null, customStr = '') {
         ) {
           return;
         }
-        if (userLongStr) {
-          curr[k] = userLongStr;
-        } else {
-          const cleanOrig = val.replace(/^【超长测试】/, '').slice(0, 12) || k;
-          curr[k] = `【超长测试】${cleanOrig}_用于检测前端表格列宽与容器省略号是否溢出的极限超长文本_LONG_TEXT_999999999999`;
-        }
+        curr[k] = buildLongStringOfLength(val, k, targetCharLen);
       } else if (typeof val === 'number') {
         curr[k] = Number.isInteger(val) ? 99999999 : 99999999.88;
       } else if (val && typeof val === 'object') {
@@ -613,9 +630,10 @@ function executeBatchTransform(mode) {
   }
 
   chrome.storage.local.set({ mockRules }, () => {
+    const longLen = getCustomLongLength();
     showToast(
       mode === 'long'
-        ? `已将当前页 ${changedCount} 个接口设为超长数据并刷新`
+        ? `已将当前页 ${changedCount} 个接口扩充至 ${longLen} 个字符并刷新`
         : mode === 'many'
           ? `已为当前页 ${changedCount} 个接口生成 +${manyCount} 条超多数据并刷新`
           : `已将当前页 ${changedCount} 个接口置空并刷新`
@@ -1339,10 +1357,59 @@ const powerToggleBtn = document.getElementById('powerToggleBtn');
 const powerBtnText = document.getElementById('powerBtnText');
 const powerDot = document.getElementById('powerDot');
 const powerStatusLabel = document.getElementById('powerStatusLabel');
+const displayModeToggleBtn = document.getElementById('displayModeToggleBtn');
+const displayModeBtnText = document.getElementById('displayModeBtnText');
 
 let currentTriggerKey = 'Shift';
 let isRecordingKeyInPanel = false;
 let isPluginEnabled = true;
+let currentDisplayMode = location.search.includes('mode=popup') ? 'popup' : 'sidepanel';
+
+function renderDisplayModeBtn() {
+  if (!displayModeBtnText) return;
+  if (currentDisplayMode === 'popup') {
+    displayModeBtnText.textContent = '🪟 悬浮窗模式 (切侧边栏)';
+  } else {
+    displayModeBtnText.textContent = '📌 侧边栏模式 (切悬浮窗)';
+  }
+}
+
+if (displayModeToggleBtn) {
+  displayModeToggleBtn.addEventListener('click', () => {
+    const nextMode = currentDisplayMode === 'popup' ? 'sidepanel' : 'popup';
+    currentDisplayMode = nextMode;
+    renderDisplayModeBtn();
+
+    if (nextMode === 'sidepanel') {
+      chrome.runtime.sendMessage({ type: 'SET_DISPLAY_MODE', mode: 'sidepanel' });
+      if (chrome.sidePanel && typeof chrome.sidePanel.open === 'function') {
+        chrome.windows.getCurrent((win) => {
+          if (win && win.id) {
+            chrome.sidePanel
+              .open({ windowId: win.id })
+              .then(() => {
+                if (location.search.includes('mode=popup')) window.close();
+              })
+              .catch(() => {
+                showToast('已切换为侧边栏模式，请点击右上角插件图标打开');
+              });
+          }
+        });
+      } else {
+        showToast('已切换为侧边栏模式，请点击右上角插件图标打开');
+      }
+    } else {
+      chrome.runtime.sendMessage({ type: 'SET_DISPLAY_MODE', mode: 'popup' }, () => {
+        showToast('已切换为右上角悬浮窗模式');
+        if (!location.search.includes('mode=popup')) {
+          setTimeout(() => {
+            window.close();
+          }, 250);
+        }
+      });
+    }
+  });
+}
 
 function renderPowerState() {
   if (!powerToggleBtn) return;
@@ -1433,7 +1500,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-chrome.storage.local.get(['mockRules', 'triggerKey', 'pluginEnabled'], (res) => {
+chrome.storage.local.get(['mockRules', 'triggerKey', 'pluginEnabled', 'displayMode'], (res) => {
   mockRules = res.mockRules || [];
   if (res.triggerKey) {
     currentTriggerKey = res.triggerKey;
@@ -1441,8 +1508,12 @@ chrome.storage.local.get(['mockRules', 'triggerKey', 'pluginEnabled'], (res) => 
   if (typeof res.pluginEnabled === 'boolean') {
     isPluginEnabled = res.pluginEnabled;
   }
+  if (res.displayMode) {
+    currentDisplayMode = res.displayMode;
+  }
   renderHotkeyBtn();
   renderPowerState();
+  renderDisplayModeBtn();
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0] && tabs[0].id) {
       chrome.tabs.sendMessage(tabs[0].id, { type: 'GET_CAPTURED_LIST' }, (resp) => {

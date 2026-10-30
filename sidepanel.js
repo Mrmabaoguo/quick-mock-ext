@@ -320,20 +320,25 @@ function emptyArraysInJson(node) {
 }
 
 const batchLongTextInput = document.getElementById('batchLongTextInput');
+const batchLongNumInput = document.getElementById('batchLongNumInput');
 const batchManyCountInput = document.getElementById('batchManyCountInput');
 const detailLongTextInput = document.getElementById('detailLongTextInput');
+const detailLongNumInput = document.getElementById('detailLongNumInput');
 const detailManyCountInput = document.getElementById('detailManyCountInput');
 const batchManyBtn = document.getElementById('batchManyBtn');
 const batchLongManyBtn = document.getElementById('batchLongManyBtn');
 const addCustomCountBtn = document.getElementById('addCustomCountBtn');
 const detailLongManyBtn = document.getElementById('detailLongManyBtn');
 
-// 初始化并双向同步「超长字符个数」与「超多条数」配置
+// 初始化并双向同步「文字超长字数」、「数据超长位数」与「超多条数」配置
 (function initCustomStressConfig() {
-  const savedLong = localStorage.getItem('__QM_CUSTOM_LONG_LEN__') || '100';
+  const savedLongText = localStorage.getItem('__QM_CUSTOM_LONG_LEN__') || '100';
+  const savedLongNum = localStorage.getItem('__QM_CUSTOM_LONG_NUM_LEN__') || '10';
   const savedMany = localStorage.getItem('__QM_CUSTOM_MANY_COUNT__') || '50';
-  if (batchLongTextInput) batchLongTextInput.value = savedLong;
-  if (detailLongTextInput) detailLongTextInput.value = savedLong;
+  if (batchLongTextInput) batchLongTextInput.value = savedLongText;
+  if (detailLongTextInput) detailLongTextInput.value = savedLongText;
+  if (batchLongNumInput) batchLongNumInput.value = savedLongNum;
+  if (detailLongNumInput) detailLongNumInput.value = savedLongNum;
   if (batchManyCountInput) batchManyCountInput.value = savedMany;
   if (detailManyCountInput) detailManyCountInput.value = savedMany;
 
@@ -349,6 +354,20 @@ const detailLongManyBtn = document.getElementById('detailLongManyBtn');
       const v = detailLongTextInput.value;
       if (batchLongTextInput) batchLongTextInput.value = v;
       localStorage.setItem('__QM_CUSTOM_LONG_LEN__', v);
+    });
+  }
+  if (batchLongNumInput) {
+    batchLongNumInput.addEventListener('input', () => {
+      const v = batchLongNumInput.value;
+      if (detailLongNumInput) detailLongNumInput.value = v;
+      localStorage.setItem('__QM_CUSTOM_LONG_NUM_LEN__', v);
+    });
+  }
+  if (detailLongNumInput) {
+    detailLongNumInput.addEventListener('input', () => {
+      const v = detailLongNumInput.value;
+      if (batchLongNumInput) batchLongNumInput.value = v;
+      localStorage.setItem('__QM_CUSTOM_LONG_NUM_LEN__', v);
     });
   }
   if (batchManyCountInput) {
@@ -369,11 +388,21 @@ const detailLongManyBtn = document.getElementById('detailLongManyBtn');
 
 function getCustomLongLength() {
   const raw = Number(
-    (batchLongTextInput && batchLongTextInput.value) ||
-      (detailLongTextInput && detailLongTextInput.value) ||
+    (batchLongTextInput && batchLongTextInput.value) ??
+      (detailLongTextInput && detailLongTextInput.value) ??
       100
   );
-  if (!Number.isFinite(raw) || raw < 1) return 100;
+  if (!Number.isFinite(raw) || raw < 0) return 100;
+  return Math.min(Math.round(raw), 10000);
+}
+
+function getCustomLongNumLength() {
+  const raw = Number(
+    (batchLongNumInput && batchLongNumInput.value) ??
+      (detailLongNumInput && detailLongNumInput.value) ??
+      10
+  );
+  if (!Number.isFinite(raw) || raw < 0) return 10;
   return Math.min(Math.round(raw), 10000);
 }
 
@@ -405,11 +434,14 @@ function buildLongStringOfLength(origVal, fallbackKey, targetLen) {
 }
 
 function buildLongNumberOfLength(origVal, targetLen) {
-  const len = Math.max(1, Math.min(10000, Math.round(Number(targetLen) || 100)));
-  const baseStr = String(origVal ?? '9').replace(/[^0-9.]/g, '') || '9';
+  const len = Math.max(1, Math.min(10000, Math.round(Number(targetLen) || 10)));
+  let baseStr = String(origVal ?? '9').replace(/[^0-9.]/g, '') || '9';
+  if (baseStr.startsWith('0') && !baseStr.startsWith('0.')) {
+    baseStr = '9' + baseStr.slice(1);
+  }
   let out = baseStr;
   while (out.length < len) {
-    out += '9876543210';
+    out += '9876543219';
   }
   out = out.slice(0, len);
   if (out.endsWith('.')) {
@@ -422,9 +454,12 @@ function buildLongNumberOfLength(origVal, targetLen) {
   return out;
 }
 
-// 一键将接口内的展示型文本与数值均按指定字符个数扩充（跳过 id/code/status/type/日期/URL 等逻辑字段，防止页面报错）
-function lengthenDataInJson(rootNode, reqItem = null, customLen = null) {
-  const targetCharLen = customLen && Number(customLen) > 0 ? Number(customLen) : getCustomLongLength();
+// 一键将接口内的展示型文字与数值分别按「文字超长字数」与「数据超长位数」扩充
+function lengthenDataInJson(rootNode, reqItem = null, customTextLen = null, customNumLen = null) {
+  const targetTextLen =
+    customTextLen !== null && customTextLen !== undefined ? Number(customTextLen) : getCustomLongLength();
+  const targetNumLen =
+    customNumLen !== null && customNumLen !== undefined ? Number(customNumLen) : getCustomLongNumLength();
   let baseNode = rootNode;
   if (countPrimaryArrayLength(JSON.stringify(baseNode)) <= 0) {
     baseNode = expandArraysInJson(baseNode, 5, reqItem);
@@ -454,12 +489,16 @@ function lengthenDataInJson(rootNode, reqItem = null, customLen = null) {
           return;
         }
         if (/^-?\d+(\.\d+)?$/.test(val)) {
-          curr[k] = buildLongNumberOfLength(val, targetCharLen);
-        } else {
-          curr[k] = buildLongStringOfLength(val, k, targetCharLen);
+          if (targetNumLen > 0) {
+            curr[k] = buildLongNumberOfLength(val, targetNumLen);
+          }
+        } else if (targetTextLen > 0) {
+          curr[k] = buildLongStringOfLength(val, k, targetTextLen);
         }
       } else if (typeof val === 'number') {
-        curr[k] = buildLongNumberOfLength(val, targetCharLen);
+        if (targetNumLen > 0) {
+          curr[k] = buildLongNumberOfLength(val, targetNumLen);
+        }
       } else if (val && typeof val === 'object') {
         curr[k] = walk(val, depth + 1);
       }
@@ -656,14 +695,15 @@ function executeBatchTransform(mode) {
   }
 
   chrome.storage.local.set({ mockRules }, () => {
-    const longLen = getCustomLongLength();
+    const longTextLen = getCustomLongLength();
+    const longNumLen = getCustomLongNumLength();
     showToast(
       mode === 'long'
-        ? `已将当前页 ${changedCount} 个接口扩充至 ${longLen} 个字符并刷新`
+        ? `已将当前页 ${changedCount} 个接口设为超长(文字${longTextLen}字/数据${longNumLen}位)并刷新`
         : mode === 'many'
           ? `已为当前页 ${changedCount} 个接口生成 +${manyCount} 条超多数据并刷新`
           : mode === 'long_many'
-            ? `已为当前页 ${changedCount} 个接口生成 +${manyCount} 条且每条 ${longLen} 字超长数据并刷新`
+            ? `已为当前页 ${changedCount} 个接口生成 +${manyCount} 条且超长(文字${longTextLen}字/数据${longNumLen}位)并刷新`
             : `已将当前页 ${changedCount} 个接口置空并刷新`
     );
     renderList();
@@ -1338,11 +1378,12 @@ if (detailLongManyBtn) {
       }
       const parsed = JSON.parse(sourceText);
       const manyCount = getCustomManyCount();
-      const longLen = getCustomLongLength();
+      const longTextLen = getCustomLongLength();
+      const longNumLen = getCustomLongNumLength();
       const expanded = expandArraysInJson(parsed, manyCount, selectedReq);
-      const both = lengthenDataInJson(expanded, selectedReq, longLen);
+      const both = lengthenDataInJson(expanded, selectedReq, longTextLen, longNumLen);
       syncEditorAndTree(JSON.stringify(both, null, 2));
-      showToast(`已扩充 +${manyCount} 条并设为 ${longLen} 字超长，点击下方保存即生效`);
+      showToast(`已扩充 +${manyCount} 条并设为超长(文字${longTextLen}字/数据${longNumLen}位)，点击下方保存即生效`);
     } catch (e) {
       alert('JSON 格式有误，请先检查语法：' + e.message);
     }

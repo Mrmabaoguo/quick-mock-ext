@@ -1095,19 +1095,30 @@
             </button>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;">超长扩充至</span>
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;">文字超长</span>
           <input
             id="batchLongTextInput"
             type="number"
-            min="1"
+            min="0"
             max="10000"
             value="100"
-            title="一键超长时将文本字段扩充到的目标字符个数（默认 100 个字符）"
-            style="width:62px;height:24px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;text-align:center;"
+            title="文字字段扩充到的目标字符个数（默认 100 字，填 0 则不改文字）"
+            style="width:52px;height:24px;padding:0 4px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;text-align:center;"
           />
-          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">个字符</span>
-          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;margin-left:6px;">超多扩充至</span>
+          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">字</span>
+          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;margin-left:4px;">数据超长</span>
+          <input
+            id="batchLongNumInput"
+            type="number"
+            min="0"
+            max="10000"
+            value="10"
+            title="数值/数据字段扩充到的目标位数（默认 10 位，填 0 则不改数值）"
+            style="width:48px;height:24px;padding:0 4px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;text-align:center;"
+          />
+          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">位</span>
+          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;margin-left:4px;">超多</span>
           <input
             id="batchManyCountInput"
             type="number"
@@ -1115,9 +1126,9 @@
             max="5000"
             value="50"
             title="一键超多时每个接口扩充的数据条数（默认 50 条）"
-            style="width:56px;height:24px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;text-align:center;"
+            style="width:48px;height:24px;padding:0 4px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;text-align:center;"
           />
-          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">条数据</span>
+          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">条</span>
         </div>
       </div>
     </div>
@@ -1153,29 +1164,41 @@
           <button id="add10Btn" class="btn btn-sm btn-accent">+10 条</button>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-        <span class="input-label" style="font-size:11px;">超长扩充至</span>
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+        <span class="input-label" style="font-size:11px;">文字超长</span>
         <input
           id="detailLongTextInput"
           type="number"
-          min="1"
+          min="0"
           max="10000"
           value="100"
-          title="将文本字段扩充到的目标字符个数（默认 100 个字符）"
-          style="width:66px;height:26px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;text-align:center;"
+          title="文字字段扩充到的目标字符个数（默认 100 字，填 0 则不改文字）"
+          style="width:54px;height:26px;padding:0 4px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;text-align:center;"
         />
-        <span style="font-size:11px;color:var(--text-muted);">个字符</span>
-        <span class="input-label" style="font-size:11px;margin-left:6px;">超多条数</span>
+        <span style="font-size:11px;color:var(--text-muted);">字</span>
+        <span class="input-label" style="font-size:11px;margin-left:4px;">数据超长</span>
+        <input
+          id="detailLongNumInput"
+          type="number"
+          min="0"
+          max="10000"
+          value="10"
+          title="数值/数据字段扩充到的目标位数（默认 10 位，填 0 则不改数值）"
+          style="width:50px;height:26px;padding:0 4px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;text-align:center;"
+        />
+        <span style="font-size:11px;color:var(--text-muted);">位</span>
+        <span class="input-label" style="font-size:11px;margin-left:4px;">超多</span>
         <input
           id="detailManyCountInput"
           type="number"
           min="1"
           max="5000"
           value="50"
-          style="width:56px;height:26px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;text-align:center;"
+          style="width:50px;height:26px;padding:0 4px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;text-align:center;"
         />
+        <span style="font-size:11px;color:var(--text-muted);">条</span>
         <button id="addCustomCountBtn" class="btn btn-sm btn-accent" style="height:26px;padding:0 8px;">+超多条</button>
-        <button id="detailLongManyBtn" class="btn btn-sm btn-accent" style="height:26px;padding:0 8px;" title="同时按指定条数扩充并按指定字符数设为超长">超长+超多</button>
+        <button id="detailLongManyBtn" class="btn btn-sm btn-accent" style="height:26px;padding:0 8px;" title="同时按指定条数扩充并按指定字数/位数设为超长">超长+超多</button>
       </div>
     </div>
 

@@ -760,13 +760,15 @@
             <div class="qm-row">
               <span class="qm-label" id="qmArrayCountLabel">数组扩充:</span>
               <button id="qmEmptyBtn" class="qm-btn qm-btn-warn" title="将数组清空为 [] 并将 total 设为 0">置空数据</button>
-              <span class="qm-label">超长字数:</span>
-              <input id="qmLongTextInput" class="qm-input" type="number" min="1" max="10000" value="100" style="width:58px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="将文本字段扩充到的目标字符个数（默认 100 个字符）" />
-              <button id="qmLongBtn" class="qm-btn qm-btn-warn" title="按左侧输入的字符个数一键把展示文本拉长">超长数据</button>
+              <span class="qm-label">文字超长:</span>
+              <input id="qmLongTextInput" class="qm-input" type="number" min="0" max="10000" value="100" style="width:52px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="文字字段扩充到的目标字符个数（默认 100 字，填 0 不改文字）" />
+              <span class="qm-label">数据超长:</span>
+              <input id="qmLongNumInput" class="qm-input" type="number" min="0" max="10000" value="10" style="width:48px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="数值/数据字段扩充到的目标位数（默认 10 位，填 0 不改数值）" />
+              <button id="qmLongBtn" class="qm-btn qm-btn-warn" title="按左侧文字字数与数据位数一键扩充">超长数据</button>
               <span class="qm-label">超多条数:</span>
-              <input id="qmManyCountInput" class="qm-input" type="number" min="1" max="2000" value="50" style="width:52px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="指定超多数据的扩充条数" />
+              <input id="qmManyCountInput" class="qm-input" type="number" min="1" max="2000" value="50" style="width:48px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="指定超多数据的扩充条数" />
               <button id="qmAddManyBtn" class="qm-btn qm-btn-warn" title="按左侧输入的条数一键扩充超多数据">+超多条</button>
-              <button id="qmLongManyBtn" class="qm-btn qm-btn-warn" title="同时按指定条数扩充超多数据并将文本扩充到指定超长字数">超长+超多</button>
+              <button id="qmLongManyBtn" class="qm-btn qm-btn-warn" title="同时按指定条数扩充超多数据并将文字/数据扩充到指定超长长度">超长+超多</button>
               <button id="qmAdd1Btn" class="qm-btn qm-btn-soft">+1 条</button>
               <button id="qmAdd5Btn" class="qm-btn qm-btn-soft">+5 条</button>
               <button id="qmAdd10Btn" class="qm-btn qm-btn-soft">+10 条</button>
@@ -1531,6 +1533,7 @@
     const searchCloseBtn = shadowRoot.getElementById('qmSearchCloseBtn');
     const emptyBtn = shadowRoot.getElementById('qmEmptyBtn');
     const longTextInput = shadowRoot.getElementById('qmLongTextInput');
+    const longNumInput = shadowRoot.getElementById('qmLongNumInput');
     const longBtn = shadowRoot.getElementById('qmLongBtn');
     const manyCountInput = shadowRoot.getElementById('qmManyCountInput');
     const addManyBtn = shadowRoot.getElementById('qmAddManyBtn');
@@ -1811,11 +1814,14 @@
     }
 
     function buildModalLongNumber(origVal, targetLen) {
-      const len = Math.max(1, Math.min(10000, Math.round(Number(targetLen) || 100)));
-      const baseStr = String(origVal ?? '9').replace(/[^0-9.]/g, '') || '9';
+      const len = Math.max(1, Math.min(10000, Math.round(Number(targetLen) || 10)));
+      let baseStr = String(origVal ?? '9').replace(/[^0-9.]/g, '') || '9';
+      if (baseStr.startsWith('0') && !baseStr.startsWith('0.')) {
+        baseStr = '9' + baseStr.slice(1);
+      }
       let out = baseStr;
       while (out.length < len) {
-        out += '9876543210';
+        out += '9876543219';
       }
       out = out.slice(0, len);
       if (out.endsWith('.')) {
@@ -1828,15 +1834,18 @@
       return out;
     }
 
-    function lengthenDataInJson(rootNode, customLen) {
+    function lengthenDataInJson(rootNode, customTextLen, customNumLen) {
       let baseNode = rootNode;
       if (countPrimaryArrayLength(JSON.stringify(baseNode)) <= 0) {
         baseNode = expandArraysInJson(baseNode, 5);
       }
-      const targetCharLen = Math.max(
-        1,
-        Math.min(10000, parseInt(String(customLen || (longTextInput && longTextInput.value) || '100'), 10) || 100)
-      );
+      const rawTextLen = customTextLen !== undefined ? customTextLen : longTextInput && longTextInput.value;
+      const rawNumLen = customNumLen !== undefined ? customNumLen : longNumInput && longNumInput.value;
+      const targetTextLen = Math.max(0, Math.min(10000, parseInt(String(rawTextLen ?? '100'), 10)));
+      const targetNumLen = Math.max(0, Math.min(10000, parseInt(String(rawNumLen ?? '10'), 10)));
+      const finalTextLen = Number.isNaN(targetTextLen) ? 100 : targetTextLen;
+      const finalNumLen = Number.isNaN(targetNumLen) ? 10 : targetNumLen;
+
       const SKIP_KEY_RE =
         /^(id|.*Id|.*_id|key|uuid|code|status|state|type|flag|sex|gender|level|sort|order|page|pageNum|pageSize|size|current|total|totalCount|totalElements|recordsTotal|is.*|has.*|enable.*|url|path|href|src|icon|avatar|img|image|color|token|sign)$/i;
 
@@ -1862,12 +1871,16 @@
               return;
             }
             if (/^-?\d+(\.\d+)?$/.test(val)) {
-              curr[k] = buildModalLongNumber(val, targetCharLen);
-            } else {
-              curr[k] = buildModalLongString(val, k, targetCharLen);
+              if (finalNumLen > 0) {
+                curr[k] = buildModalLongNumber(val, finalNumLen);
+              }
+            } else if (finalTextLen > 0) {
+              curr[k] = buildModalLongString(val, k, finalTextLen);
             }
           } else if (typeof val === 'number') {
-            curr[k] = buildModalLongNumber(val, targetCharLen);
+            if (finalNumLen > 0) {
+              curr[k] = buildModalLongNumber(val, finalNumLen);
+            }
           } else if (val && typeof val === 'object') {
             curr[k] = walk(val, depth + 1);
           }
@@ -1893,8 +1906,7 @@
       longBtn.addEventListener('click', () => {
         try {
           const parsed = JSON.parse(textarea.value);
-          const customLen = longTextInput ? longTextInput.value : '100';
-          const lengthened = lengthenDataInJson(parsed, customLen);
+          const lengthened = lengthenDataInJson(parsed);
           syncModalEditorAndTree(JSON.stringify(lengthened, null, 2));
         } catch (e) {
           alert('JSON 语法错误，请检查引号或逗号：' + e.message);
@@ -1941,9 +1953,8 @@
           }
           const parsed = JSON.parse(sourceText);
           const count = Math.max(1, Math.min(2000, parseInt((manyCountInput && manyCountInput.value) || '50', 10) || 50));
-          const customLen = longTextInput ? longTextInput.value : '100';
           const expanded = expandArraysInJson(parsed, count);
-          const both = lengthenDataInJson(expanded, customLen);
+          const both = lengthenDataInJson(expanded);
           syncModalEditorAndTree(JSON.stringify(both, null, 2));
         } catch (e) {
           alert('JSON 语法错误，请检查引号或逗号：' + e.message);

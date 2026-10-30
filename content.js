@@ -151,11 +151,17 @@
           const pf = (document.documentElement.getAttribute('data-qm-page-fields') || '')
             .split(',')
             .filter(Boolean);
-          if (pf.length > 0) {
-            capturedList.forEach((item) => {
-              if (!item.pageFields || item.pageFields.length === 0) item.pageFields = pf;
-            });
-          }
+          let activeUrls = [];
+          try {
+            activeUrls = JSON.parse(document.documentElement.getAttribute('data-qm-active-urls') || '[]');
+          } catch {}
+          const activeSet = new Set(activeUrls);
+          capturedList.forEach((item) => {
+            if (pf.length > 0 && (!item.pageFields || item.pageFields.length === 0)) {
+              item.pageFields = pf;
+            }
+            item.isActiveView = activeSet.has(item.url);
+          });
           sendResponse({ list: capturedList });
           return true;
         }
@@ -168,7 +174,23 @@
       window.removeEventListener('message', onWindowMessage);
       return;
     }
-    if (!event.data || event.data.source !== 'QUICK_MOCK_INJECT' || event.data.type !== 'CAPTURED') {
+    if (!event.data || event.data.source !== 'QUICK_MOCK_INJECT') {
+      return;
+    }
+
+    if (event.data.type === 'ACTIVE_VIEW_URLS') {
+      const activeSet = new Set(event.data.urls || []);
+      capturedList.forEach((item) => {
+        item.isActiveView = activeSet.has(item.url);
+      });
+      safeSendMessage({
+        type: 'NEW_CAPTURED_LIST',
+        list: capturedList
+      });
+      return;
+    }
+
+    if (event.data.type !== 'CAPTURED') {
       return;
     }
     const item = event.data.payload;
@@ -180,6 +202,10 @@
     if (pf.length > 0 && (!item.pageFields || item.pageFields.length === 0)) {
       item.pageFields = pf;
     }
+    try {
+      const activeUrls = JSON.parse(document.documentElement.getAttribute('data-qm-active-urls') || '[]');
+      item.isActiveView = activeUrls.includes(item.url);
+    } catch {}
 
     const existingIdx = capturedList.findIndex(
       (x) => x.url === item.url && x.method === item.method
@@ -691,6 +717,7 @@
             <div class="qm-row">
               <span class="qm-label" id="qmArrayCountLabel">数组扩充:</span>
               <button id="qmEmptyBtn" class="qm-btn qm-btn-warn" title="将数组清空为 [] 并将 total 设为 0">置空数据</button>
+              <button id="qmLongBtn" class="qm-btn qm-btn-warn" title="一键把展示文本与数值拉长以测试样式溢出">超长数据</button>
               <button id="qmAdd1Btn" class="qm-btn qm-btn-soft">+1 条</button>
               <button id="qmAdd5Btn" class="qm-btn qm-btn-soft">+5 条</button>
               <button id="qmAdd10Btn" class="qm-btn qm-btn-soft">+10 条</button>
@@ -1444,6 +1471,7 @@
     const searchNextBtn = shadowRoot.getElementById('qmSearchNextBtn');
     const searchCloseBtn = shadowRoot.getElementById('qmSearchCloseBtn');
     const emptyBtn = shadowRoot.getElementById('qmEmptyBtn');
+    const longBtn = shadowRoot.getElementById('qmLongBtn');
     const add1Btn = shadowRoot.getElementById('qmAdd1Btn');
     const add5Btn = shadowRoot.getElementById('qmAdd5Btn');
     const add10Btn = shadowRoot.getElementById('qmAdd10Btn');
@@ -1619,12 +1647,66 @@
       return res;
     }
 
+    function lengthenDataInJson(rootNode) {
+      let baseNode = rootNode;
+      if (countPrimaryArrayLength(JSON.stringify(baseNode)) <= 0) {
+        baseNode = expandArraysInJson(baseNode, 5);
+      }
+      const SKIP_KEY_RE =
+        /^(id|.*Id|.*_id|key|uuid|code|status|state|type|flag|sex|gender|level|sort|order|page|pageNum|pageSize|size|current|total|totalCount|totalElements|recordsTotal|is.*|has.*|enable.*|url|path|href|src|icon|avatar|img|image|color|token|sign)$/i;
+
+      function walk(curr, depth) {
+        if (depth > 8 || curr === null || typeof curr !== 'object') return curr;
+        if (Array.isArray(curr)) {
+          return curr.map((item) => walk(item, depth + 1));
+        }
+        Object.keys(curr).forEach((k) => {
+          const val = curr[k];
+          if (depth === 0 && /^(code|status|msg|message|success|ok|errCode)$/i.test(k)) {
+            return;
+          }
+          if (SKIP_KEY_RE.test(k)) return;
+
+          if (typeof val === 'string') {
+            if (
+              /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(val) ||
+              /^\d{2}:\d{2}/.test(val) ||
+              /^https?:\/\//i.test(val) ||
+              /^(true|false|null|\d+)$/i.test(val)
+            ) {
+              return;
+            }
+            const cleanOrig = val.replace(/^【超长测试】/, '').slice(0, 12) || k;
+            curr[k] = `【超长测试】${cleanOrig}_用于检测前端表格列宽与容器省略号是否溢出的极限超长文本_LONG_TEXT_999999999999`;
+          } else if (typeof val === 'number') {
+            curr[k] = Number.isInteger(val) ? 99999999 : 99999999.88;
+          } else if (val && typeof val === 'object') {
+            curr[k] = walk(val, depth + 1);
+          }
+        });
+        return curr;
+      }
+      return walk(baseNode, 0);
+    }
+
     if (emptyBtn) {
       emptyBtn.addEventListener('click', () => {
         try {
           const parsed = JSON.parse(textarea.value);
           const emptied = emptyArraysInJson(parsed);
           syncModalEditorAndTree(JSON.stringify(emptied, null, 2));
+        } catch (e) {
+          alert('JSON 语法错误，请检查引号或逗号：' + e.message);
+        }
+      });
+    }
+
+    if (longBtn) {
+      longBtn.addEventListener('click', () => {
+        try {
+          const parsed = JSON.parse(textarea.value);
+          const lengthened = lengthenDataInJson(parsed);
+          syncModalEditorAndTree(JSON.stringify(lengthened, null, 2));
         } catch (e) {
           alert('JSON 语法错误，请检查引号或逗号：' + e.message);
         }

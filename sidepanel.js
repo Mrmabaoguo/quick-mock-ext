@@ -315,6 +315,76 @@ function emptyArraysInJson(node) {
   return res;
 }
 
+// 一键将接口内的展示型文本与数值拉长（跳过 id/code/status/type/日期/URL 等逻辑字段，防止页面报错）
+function lengthenDataInJson(rootNode, reqItem = null) {
+  let baseNode = rootNode;
+  if (countPrimaryArrayLength(JSON.stringify(baseNode)) <= 0) {
+    baseNode = expandArraysInJson(baseNode, 5, reqItem);
+  }
+  const SKIP_KEY_RE =
+    /^(id|.*Id|.*_id|key|uuid|code|status|state|type|flag|sex|gender|level|sort|order|page|pageNum|pageSize|size|current|total|totalCount|totalElements|recordsTotal|is.*|has.*|enable.*|url|path|href|src|icon|avatar|img|image|color|token|sign)$/i;
+
+  function walk(curr, depth) {
+    if (depth > 8 || curr === null || typeof curr !== 'object') return curr;
+    if (Array.isArray(curr)) {
+      return curr.map((item) => walk(item, depth + 1));
+    }
+    Object.keys(curr).forEach((k) => {
+      const val = curr[k];
+      if (depth === 0 && /^(code|status|msg|message|success|ok|errCode)$/i.test(k)) {
+        return;
+      }
+      if (SKIP_KEY_RE.test(k)) return;
+
+      if (typeof val === 'string') {
+        if (
+          /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(val) ||
+          /^\d{2}:\d{2}/.test(val) ||
+          /^https?:\/\//i.test(val) ||
+          /^(true|false|null|\d+)$/i.test(val)
+        ) {
+          return;
+        }
+        const cleanOrig = val.replace(/^【超长测试】/, '').slice(0, 12) || k;
+        curr[k] = `【超长测试】${cleanOrig}_用于检测前端表格列宽与容器省略号是否溢出的极限超长文本_LONG_TEXT_999999999999`;
+      } else if (typeof val === 'number') {
+        curr[k] = Number.isInteger(val) ? 99999999 : 99999999.88;
+      } else if (val && typeof val === 'object') {
+        curr[k] = walk(val, depth + 1);
+      }
+    });
+    return curr;
+  }
+  return walk(baseNode, 0);
+}
+
+const manualCheckedUrls = new Set();
+const manualUncheckedUrls = new Set();
+const activeViewCountEl = document.getElementById('activeViewCount');
+const batchLongBtn = document.getElementById('batchLongBtn');
+const batchEmptyBtn = document.getElementById('batchEmptyBtn');
+
+function isSystemInfrastructureUrl(url) {
+  return /\/(login|logout|auth|token|userInfo|getInfo|getRouters|menu|nav|dict|permission|config|unread|notice)\b/i.test(
+    url || ''
+  );
+}
+
+function isItemCheckedForBatch(item) {
+  if (!item || !item.url) return false;
+  if (manualCheckedUrls.has(item.url)) return true;
+  if (manualUncheckedUrls.has(item.url)) return false;
+  const anyExplicitActive = capturedRequests.some((r) => r.isActiveView);
+  if (anyExplicitActive) {
+    return Boolean(item.isActiveView);
+  }
+  return !isSystemInfrastructureUrl(item.url);
+}
+
+function getCheckedBatchItems() {
+  return capturedRequests.filter((item) => isItemCheckedForBatch(item));
+}
+
 function renderList() {
   const kw = searchInput.value.trim();
   clearSearchBtn.style.display = kw ? 'block' : 'none';
@@ -323,6 +393,9 @@ function renderList() {
   const mockedTotal = capturedRequests.filter((item) => isReqMocked(item) || item.mocked).length;
   countAll.textContent = capturedRequests.length;
   countMocked.textContent = mockedTotal;
+  if (activeViewCountEl) {
+    activeViewCountEl.textContent = getCheckedBatchItems().length;
+  }
 
   const filtered = capturedRequests.filter((item) => {
     const mocked = isReqMocked(item) || item.mocked;
@@ -353,6 +426,7 @@ function renderList() {
   reqListEl.innerHTML = '';
   filtered.forEach((item) => {
     const mocked = isReqMocked(item) || item.mocked;
+    const checked = isItemCheckedForBatch(item);
     const card = document.createElement('div');
     card.className = `req-card ${mocked ? 'mocked' : ''}`;
 
@@ -366,20 +440,42 @@ function renderList() {
 
     card.innerHTML = `
       <div class="card-row-1">
+        <input type="checkbox" class="req-batch-check" ${checked ? 'checked' : ''} title="勾选后参与顶部「一键超长 / 一键空数据」" style="cursor:pointer;accent-color:#2563eb;" />
         <span class="method-badge ${item.method}">${escapeHtml(item.method)}</span>
         <span class="url-text" title="${escapeHtml(item.url)}">${escapeHtml(getShortPath(item.url))}</span>
+        ${checked ? '<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;font-size:10px;padding:1px 5px;border-radius:4px;font-weight:600;flex-shrink:0;">当前页</span>' : ''}
         ${mocked ? '<span class="status-pill">已改写</span>' : ''}
-        <button class="quick-empty-btn" title="免进详情：直接将该接口数据置空并刷新网页">置空</button>
-        <button class="quick-plus-btn" title="免进详情：直接将该接口数组扩充5条并刷新网页">+5条</button>
+        <button class="quick-empty-btn" title="直接将该接口数据置空并刷新网页">置空</button>
+        <button class="quick-long-btn" style="height:22px;padding:0 6px;border-radius:4px;border:1px solid #fed7aa;background:#fff7ed;color:#ea580c;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0;" title="直接将该接口数据变为超长文本并刷新网页">超长</button>
+        <button class="quick-plus-btn" title="直接将该接口数组扩充5条并刷新网页">+5条</button>
       </div>
       <div class="card-preview">${oneLinePreview}</div>
       ${snippetHtml ? `<div class="match-box">${snippetHtml}</div>` : ''}
     `;
 
+    const checkEl = card.querySelector('.req-batch-check');
+    checkEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (checkEl.checked) {
+        manualCheckedUrls.add(item.url);
+        manualUncheckedUrls.delete(item.url);
+      } else {
+        manualUncheckedUrls.add(item.url);
+        manualCheckedUrls.delete(item.url);
+      }
+      renderList();
+    });
+
     const quickEmptyBtn = card.querySelector('.quick-empty-btn');
     quickEmptyBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       quickEmptyAndSave(item);
+    });
+
+    const quickLongBtn = card.querySelector('.quick-long-btn');
+    quickLongBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      quickLongAndSave(item);
     });
 
     const quickBtn = card.querySelector('.quick-plus-btn');
@@ -391,6 +487,72 @@ function renderList() {
     card.addEventListener('click', () => openDetailView(item));
     reqListEl.appendChild(card);
   });
+}
+
+function quickLongAndSave(item) {
+  try {
+    const savedRule = mockRules.find((r) => r.matchKey && item.url.includes(r.matchKey));
+    let sourceText = item.originalBody || (savedRule ? savedRule.mockBody : item.responseBody) || '';
+    const parsed = JSON.parse(sourceText);
+    const lengthened = lengthenDataInJson(parsed, item);
+    const newBody = JSON.stringify(lengthened, null, 2);
+    const matchKey = savedRule ? savedRule.matchKey : getDefaultMatchKey(item.url);
+    saveRuleAndReload(matchKey, newBody, item);
+  } catch (err) {
+    openDetailView(item);
+  }
+}
+
+function executeBatchTransform(mode) {
+  const targetItems = getCheckedBatchItems();
+  if (targetItems.length === 0) {
+    alert('当前未勾选任何页面接口，请先在列表中勾选要测试的接口');
+    return;
+  }
+  let changedCount = 0;
+  targetItems.forEach((item) => {
+    try {
+      const savedRule = mockRules.find((r) => r.matchKey && item.url.includes(r.matchKey));
+      const sourceText = item.originalBody || (savedRule ? savedRule.mockBody : item.responseBody) || '';
+      if (!sourceText) return;
+      const parsed = JSON.parse(sourceText);
+      const transformed =
+        mode === 'long' ? lengthenDataInJson(parsed, item) : emptyArraysInJson(parsed);
+      const mockBody = JSON.stringify(transformed, null, 2);
+      const matchKey = savedRule ? savedRule.matchKey : getDefaultMatchKey(item.url);
+
+      const idx = mockRules.findIndex((r) => r.matchKey === matchKey);
+      const newRule = { matchKey, method: 'ALL', mockBody, enabled: true };
+      if (idx >= 0) mockRules[idx] = newRule;
+      else mockRules.push(newRule);
+
+      item.responseBody = mockBody;
+      item.mocked = true;
+      changedCount++;
+    } catch {}
+  });
+
+  if (changedCount === 0) {
+    alert('所选接口响应不是有效 JSON，无法批量改写');
+    return;
+  }
+
+  chrome.storage.local.set({ mockRules }, () => {
+    showToast(
+      mode === 'long'
+        ? `已将当前页 ${changedCount} 个接口设为超长数据并刷新`
+        : `已将当前页 ${changedCount} 个接口置空并刷新`
+    );
+    renderList();
+    reloadActiveTab();
+  });
+}
+
+if (batchLongBtn) {
+  batchLongBtn.addEventListener('click', () => executeBatchTransform('long'));
+}
+if (batchEmptyBtn) {
+  batchEmptyBtn.addEventListener('click', () => executeBatchTransform('empty'));
 }
 
 function quickEmptyAndSave(item) {
@@ -952,6 +1114,20 @@ if (emptyDataBtn) {
       const emptied = emptyArraysInJson(parsed);
       syncEditorAndTree(JSON.stringify(emptied, null, 2));
       showToast('已将数据置空，点击下方保存即生效');
+    } catch (e) {
+      alert('JSON 格式有误，请先检查语法：' + e.message);
+    }
+  });
+}
+
+const longDataBtn = document.getElementById('longDataBtn');
+if (longDataBtn) {
+  longDataBtn.addEventListener('click', () => {
+    try {
+      const parsed = JSON.parse(jsonEditor.value);
+      const lengthened = lengthenDataInJson(parsed, selectedReq);
+      syncEditorAndTree(JSON.stringify(lengthened, null, 2));
+      showToast('已生成超长测试数据，点击下方保存即生效');
     } catch (e) {
       alert('JSON 格式有误，请先检查语法：' + e.message);
     }

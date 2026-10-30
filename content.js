@@ -408,10 +408,11 @@
         align-items: center;
         gap: 6px;
         flex-shrink: 0;
-        flex-wrap: wrap;
+        min-width: 0;
       }
       .qm-api-select {
         flex: 1;
+        min-width: 0;
         height: 32px;
         font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
       }
@@ -421,10 +422,21 @@
         border-radius: 8px;
         padding: 8px 12px;
         display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .qm-quick-line {
+        width: 100%;
+        display: flex;
         align-items: center;
-        justify-content: flex-start;
-        gap: 8px 12px;
+        justify-content: space-between;
+        gap: 6px 10px;
         flex-wrap: wrap;
+      }
+      .qm-quick-line-sub {
+        border-top: 1px dashed #e2e8f0;
+        padding-top: 7px;
+        justify-content: flex-start;
       }
       .qm-replace-group {
         display: flex;
@@ -750,28 +762,36 @@
           </div>
 
           <div class="qm-quick-bar">
-            <div class="qm-replace-group">
-              <span class="qm-label">选中值替换:</span>
-              <input id="qmFindInput" class="qm-input qm-input-sm" type="text" placeholder="原文本/数值" />
-              <span class="qm-label">→</span>
-              <input id="qmReplaceInput" class="qm-input qm-input-sm" type="text" placeholder="改为新内容" />
-              <button id="qmDoReplaceBtn" class="qm-btn qm-btn-soft">替换到 JSON</button>
+            <div class="qm-quick-line">
+              <div class="qm-replace-group">
+                <span class="qm-label">选中值替换:</span>
+                <input id="qmFindInput" class="qm-input qm-input-sm" type="text" placeholder="原文本/数值" />
+                <span class="qm-label">→</span>
+                <input id="qmReplaceInput" class="qm-input qm-input-sm" type="text" placeholder="改为新内容" />
+                <button id="qmDoReplaceBtn" class="qm-btn qm-btn-soft">替换到 JSON</button>
+              </div>
+              <div class="qm-replace-group">
+                <span class="qm-label" id="qmArrayCountLabel">数组扩充:</span>
+                <button id="qmEmptyBtn" class="qm-btn qm-btn-warn" title="将数组清空为 [] 并将 total 设为 0">置空数据</button>
+                <button id="qmAdd1Btn" class="qm-btn qm-btn-soft">+1 条</button>
+                <button id="qmAdd5Btn" class="qm-btn qm-btn-soft">+5 条</button>
+                <button id="qmAdd10Btn" class="qm-btn qm-btn-soft">+10 条</button>
+              </div>
             </div>
-            <div class="qm-row">
-              <span class="qm-label" id="qmArrayCountLabel">数组扩充:</span>
-              <button id="qmEmptyBtn" class="qm-btn qm-btn-warn" title="将数组清空为 [] 并将 total 设为 0">置空数据</button>
+            <div class="qm-quick-line qm-quick-line-sub">
               <span class="qm-label">文字超长:</span>
-              <input id="qmLongTextInput" class="qm-input" type="number" min="0" max="10000" value="100" style="width:52px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="文字字段扩充到的目标字符个数（默认 100 字，填 0 不改文字）" />
-              <span class="qm-label">数据超长:</span>
-              <input id="qmLongNumInput" class="qm-input" type="number" min="0" max="10000" value="10" style="width:48px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="数值/数据字段扩充到的目标位数（默认 10 位，填 0 不改数值）" />
+              <input id="qmLongTextInput" class="qm-input" type="number" min="0" max="10000" value="100" style="width:54px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="文字字段扩充到的目标字符个数（默认 100 字，填 0 不改文字）" />
+              <span class="qm-label" style="margin-left:-2px;">字</span>
+              <span class="qm-label" style="margin-left:4px;">数据超长:</span>
+              <input id="qmLongNumInput" class="qm-input" type="number" min="0" max="10000" value="10" style="width:50px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="数值/数据字段扩充到的目标位数（默认 10 位，填 0 不改数值）" />
+              <span class="qm-label" style="margin-left:-2px;">位</span>
               <button id="qmLongBtn" class="qm-btn qm-btn-warn" title="按左侧文字字数与数据位数一键扩充">超长数据</button>
+              <span style="color:#cbd5e1;margin:0 2px;">|</span>
               <span class="qm-label">超多条数:</span>
-              <input id="qmManyCountInput" class="qm-input" type="number" min="1" max="2000" value="50" style="width:48px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="指定超多数据的扩充条数" />
+              <input id="qmManyCountInput" class="qm-input" type="number" min="1" max="2000" value="50" style="width:50px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="指定超多数据的扩充条数" />
+              <span class="qm-label" style="margin-left:-2px;">条</span>
               <button id="qmAddManyBtn" class="qm-btn qm-btn-warn" title="按左侧输入的条数一键扩充超多数据">+超多条</button>
               <button id="qmLongManyBtn" class="qm-btn qm-btn-warn" title="同时按指定条数扩充超多数据并将文字/数据扩充到指定超长长度">超长+超多</button>
-              <button id="qmAdd1Btn" class="qm-btn qm-btn-soft">+1 条</button>
-              <button id="qmAdd5Btn" class="qm-btn qm-btn-soft">+5 条</button>
-              <button id="qmAdd10Btn" class="qm-btn qm-btn-soft">+10 条</button>
             </div>
           </div>
 

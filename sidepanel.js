@@ -315,8 +315,74 @@ function emptyArraysInJson(node) {
   return res;
 }
 
+const batchLongTextInput = document.getElementById('batchLongTextInput');
+const batchManyCountInput = document.getElementById('batchManyCountInput');
+const detailLongTextInput = document.getElementById('detailLongTextInput');
+const detailManyCountInput = document.getElementById('detailManyCountInput');
+const batchManyBtn = document.getElementById('batchManyBtn');
+const addCustomCountBtn = document.getElementById('addCustomCountBtn');
+
+// 初始化并双向同步「指定超长字符」与「超多条数」配置
+(function initCustomStressConfig() {
+  const savedLong = localStorage.getItem('__QM_CUSTOM_LONG_TEXT__') || '';
+  const savedMany = localStorage.getItem('__QM_CUSTOM_MANY_COUNT__') || '50';
+  if (batchLongTextInput) batchLongTextInput.value = savedLong;
+  if (detailLongTextInput) detailLongTextInput.value = savedLong;
+  if (batchManyCountInput) batchManyCountInput.value = savedMany;
+  if (detailManyCountInput) detailManyCountInput.value = savedMany;
+
+  if (batchLongTextInput) {
+    batchLongTextInput.addEventListener('input', () => {
+      const v = batchLongTextInput.value;
+      if (detailLongTextInput) detailLongTextInput.value = v;
+      localStorage.setItem('__QM_CUSTOM_LONG_TEXT__', v);
+    });
+  }
+  if (detailLongTextInput) {
+    detailLongTextInput.addEventListener('input', () => {
+      const v = detailLongTextInput.value;
+      if (batchLongTextInput) batchLongTextInput.value = v;
+      localStorage.setItem('__QM_CUSTOM_LONG_TEXT__', v);
+    });
+  }
+  if (batchManyCountInput) {
+    batchManyCountInput.addEventListener('input', () => {
+      const v = batchManyCountInput.value;
+      if (detailManyCountInput) detailManyCountInput.value = v;
+      localStorage.setItem('__QM_CUSTOM_MANY_COUNT__', v);
+    });
+  }
+  if (detailManyCountInput) {
+    detailManyCountInput.addEventListener('input', () => {
+      const v = detailManyCountInput.value;
+      if (batchManyCountInput) batchManyCountInput.value = v;
+      localStorage.setItem('__QM_CUSTOM_MANY_COUNT__', v);
+    });
+  }
+})();
+
+function getCustomLongString() {
+  const raw = (
+    (batchLongTextInput && batchLongTextInput.value) ||
+    (detailLongTextInput && detailLongTextInput.value) ||
+    ''
+  ).trim();
+  return raw;
+}
+
+function getCustomManyCount() {
+  const raw = Number(
+    (batchManyCountInput && batchManyCountInput.value) ||
+      (detailManyCountInput && detailManyCountInput.value) ||
+      50
+  );
+  if (!Number.isFinite(raw) || raw < 1) return 50;
+  return Math.min(Math.round(raw), 5000);
+}
+
 // 一键将接口内的展示型文本与数值拉长（跳过 id/code/status/type/日期/URL 等逻辑字段，防止页面报错）
-function lengthenDataInJson(rootNode, reqItem = null) {
+function lengthenDataInJson(rootNode, reqItem = null, customStr = '') {
+  const userLongStr = (customStr !== undefined && customStr !== '' ? customStr : getCustomLongString()).trim();
   let baseNode = rootNode;
   if (countPrimaryArrayLength(JSON.stringify(baseNode)) <= 0) {
     baseNode = expandArraysInJson(baseNode, 5, reqItem);
@@ -345,8 +411,12 @@ function lengthenDataInJson(rootNode, reqItem = null) {
         ) {
           return;
         }
-        const cleanOrig = val.replace(/^【超长测试】/, '').slice(0, 12) || k;
-        curr[k] = `【超长测试】${cleanOrig}_用于检测前端表格列宽与容器省略号是否溢出的极限超长文本_LONG_TEXT_999999999999`;
+        if (userLongStr) {
+          curr[k] = userLongStr;
+        } else {
+          const cleanOrig = val.replace(/^【超长测试】/, '').slice(0, 12) || k;
+          curr[k] = `【超长测试】${cleanOrig}_用于检测前端表格列宽与容器省略号是否溢出的极限超长文本_LONG_TEXT_999999999999`;
+        }
       } else if (typeof val === 'number') {
         curr[k] = Number.isInteger(val) ? 99999999 : 99999999.88;
       } else if (val && typeof val === 'object') {
@@ -509,6 +579,7 @@ function executeBatchTransform(mode) {
     alert('当前未勾选任何页面接口，请先在列表中勾选要测试的接口');
     return;
   }
+  const manyCount = getCustomManyCount();
   let changedCount = 0;
   targetItems.forEach((item) => {
     try {
@@ -517,7 +588,11 @@ function executeBatchTransform(mode) {
       if (!sourceText) return;
       const parsed = JSON.parse(sourceText);
       const transformed =
-        mode === 'long' ? lengthenDataInJson(parsed, item) : emptyArraysInJson(parsed);
+        mode === 'long'
+          ? lengthenDataInJson(parsed, item)
+          : mode === 'many'
+            ? expandArraysInJson(parsed, manyCount, item)
+            : emptyArraysInJson(parsed);
       const mockBody = JSON.stringify(transformed, null, 2);
       const matchKey = savedRule ? savedRule.matchKey : getDefaultMatchKey(item.url);
 
@@ -541,7 +616,9 @@ function executeBatchTransform(mode) {
     showToast(
       mode === 'long'
         ? `已将当前页 ${changedCount} 个接口设为超长数据并刷新`
-        : `已将当前页 ${changedCount} 个接口置空并刷新`
+        : mode === 'many'
+          ? `已为当前页 ${changedCount} 个接口生成 +${manyCount} 条超多数据并刷新`
+          : `已将当前页 ${changedCount} 个接口置空并刷新`
     );
     renderList();
     reloadActiveTab();
@@ -550,6 +627,9 @@ function executeBatchTransform(mode) {
 
 if (batchLongBtn) {
   batchLongBtn.addEventListener('click', () => executeBatchTransform('long'));
+}
+if (batchManyBtn) {
+  batchManyBtn.addEventListener('click', () => executeBatchTransform('many'));
 }
 if (batchEmptyBtn) {
   batchEmptyBtn.addEventListener('click', () => executeBatchTransform('empty'));
@@ -1137,6 +1217,9 @@ if (longDataBtn) {
 add1Btn.addEventListener('click', () => handleAddRows(1));
 add5Btn.addEventListener('click', () => handleAddRows(5));
 add10Btn.addEventListener('click', () => handleAddRows(10));
+if (addCustomCountBtn) {
+  addCustomCountBtn.addEventListener('click', () => handleAddRows(getCustomManyCount()));
+}
 jsonEditor.addEventListener('input', updateArrayInfoLabel);
 
 function saveRuleAndReload(matchKey, mockBody, reqItem) {

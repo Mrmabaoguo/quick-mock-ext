@@ -990,28 +990,56 @@
 
       <div
         id="batchActionBar"
-        style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;background:#f8fafc;border:1px solid var(--border-light);border-radius:6px;flex-wrap:wrap;"
+        style="display:flex;flex-direction:column;gap:6px;padding:7px 8px;background:#f8fafc;border:1px solid var(--border-light);border-radius:6px;"
       >
-        <span style="font-size:11.5px;color:var(--text-sub);font-weight:500;white-space:nowrap;">
-          当前页接口 (<span id="activeViewCount" style="color:var(--primary);font-weight:700;">0</span>)
-        </span>
-        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
-          <button
-            id="batchLongBtn"
-            class="btn btn-sm btn-accent"
-            style="height:24px;padding:0 8px;font-size:11px;"
-            title="将已勾选的当前页接口全部生成超长测试文本并刷新"
-          >
-            一键超长
-          </button>
-          <button
-            id="batchEmptyBtn"
-            class="btn btn-sm btn-warn"
-            style="height:24px;padding:0 8px;font-size:11px;"
-            title="将已勾选的当前页接口全部置为空数组 [] 并刷新"
-          >
-            一键空数据
-          </button>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:11.5px;color:var(--text-sub);font-weight:600;white-space:nowrap;">
+            当前页接口 (<span id="activeViewCount" style="color:var(--primary);font-weight:700;">0</span>)
+          </span>
+          <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+            <button
+              id="batchLongBtn"
+              class="btn btn-sm btn-accent"
+              style="height:24px;padding:0 8px;font-size:11px;"
+              title="按下方指定超长字符将当前页已勾选接口全部设为超长并刷新"
+            >
+              一键超长
+            </button>
+            <button
+              id="batchManyBtn"
+              class="btn btn-sm btn-accent"
+              style="height:24px;padding:0 8px;font-size:11px;"
+              title="按下方指定条数将当前页已勾选接口全部生成超多条数据并刷新"
+            >
+              一键超多
+            </button>
+            <button
+              id="batchEmptyBtn"
+              class="btn btn-sm btn-warn"
+              style="height:24px;padding:0 8px;font-size:11px;"
+              title="将已勾选的当前页接口全部置为空数组 [] 并刷新"
+            >
+              一键空数据
+            </button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;">超长字符</span>
+          <input
+            id="batchLongTextInput"
+            type="text"
+            placeholder="留空用默认60字超长串，或输入指定超长内容..."
+            style="flex:1;min-width:60px;height:24px;padding:0 6px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;"
+          />
+          <span style="font-size:11px;color:var(--text-sub);white-space:nowrap;">超多条数</span>
+          <input
+            id="batchManyCountInput"
+            type="number"
+            min="1"
+            max="5000"
+            value="50"
+            style="width:54px;height:24px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11px;background:#fff;color:var(--text-main);outline:none;text-align:center;"
+          />
         </div>
       </div>
     </div>
@@ -1041,11 +1069,30 @@
         <span class="input-label" id="arrayInfoText">快速造数（自动识别数组）</span>
         <div class="tool-group">
           <button id="emptyDataBtn" class="btn btn-sm btn-warn" title="将数组清空为 [] 并将 total 设为 0">置空数据</button>
-          <button id="longDataBtn" class="btn btn-sm btn-warn" title="将该接口展示文本和数值拉长，测试样式溢出与省略号">超长数据</button>
+          <button id="longDataBtn" class="btn btn-sm btn-warn" title="按下方指定超长字符将该接口展示文本和数值拉长">超长数据</button>
           <button id="add1Btn" class="btn btn-sm btn-accent">+1 条</button>
           <button id="add5Btn" class="btn btn-sm btn-accent">+5 条</button>
           <button id="add10Btn" class="btn btn-sm btn-accent">+10 条</button>
         </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span class="input-label" style="font-size:11px;">指定超长</span>
+        <input
+          id="detailLongTextInput"
+          type="text"
+          placeholder="留空用默认超长串，或输入指定超长字符..."
+          style="flex:1;min-width:80px;height:26px;padding:0 7px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;"
+        />
+        <span class="input-label" style="font-size:11px;">超多条数</span>
+        <input
+          id="detailManyCountInput"
+          type="number"
+          min="1"
+          max="5000"
+          value="50"
+          style="width:56px;height:26px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;text-align:center;"
+        />
+        <button id="addCustomCountBtn" class="btn btn-sm btn-accent" style="height:26px;padding:0 8px;">+超多条</button>
       </div>
     </div>
 

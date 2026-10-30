@@ -717,7 +717,10 @@
             <div class="qm-row">
               <span class="qm-label" id="qmArrayCountLabel">数组扩充:</span>
               <button id="qmEmptyBtn" class="qm-btn qm-btn-warn" title="将数组清空为 [] 并将 total 设为 0">置空数据</button>
+              <input id="qmLongTextInput" class="qm-input" type="text" placeholder="指定超长字符(空则默认)" style="width:125px;height:26px;font-size:11px;padding:0 6px;" title="输入指定超长字符，留空则使用默认超长测试文本" />
               <button id="qmLongBtn" class="qm-btn qm-btn-warn" title="一键把展示文本与数值拉长以测试样式溢出">超长数据</button>
+              <input id="qmManyCountInput" class="qm-input" type="number" min="1" max="2000" value="50" style="width:52px;height:26px;font-size:11px;padding:0 4px;" title="指定超多数据的扩充条数" />
+              <button id="qmAddManyBtn" class="qm-btn qm-btn-warn" title="按左侧输入的条数一键扩充超多数据">+超多条</button>
               <button id="qmAdd1Btn" class="qm-btn qm-btn-soft">+1 条</button>
               <button id="qmAdd5Btn" class="qm-btn qm-btn-soft">+5 条</button>
               <button id="qmAdd10Btn" class="qm-btn qm-btn-soft">+10 条</button>
@@ -1471,7 +1474,10 @@
     const searchNextBtn = shadowRoot.getElementById('qmSearchNextBtn');
     const searchCloseBtn = shadowRoot.getElementById('qmSearchCloseBtn');
     const emptyBtn = shadowRoot.getElementById('qmEmptyBtn');
+    const longTextInput = shadowRoot.getElementById('qmLongTextInput');
     const longBtn = shadowRoot.getElementById('qmLongBtn');
+    const manyCountInput = shadowRoot.getElementById('qmManyCountInput');
+    const addManyBtn = shadowRoot.getElementById('qmAddManyBtn');
     const add1Btn = shadowRoot.getElementById('qmAdd1Btn');
     const add5Btn = shadowRoot.getElementById('qmAdd5Btn');
     const add10Btn = shadowRoot.getElementById('qmAdd10Btn');
@@ -1647,11 +1653,15 @@
       return res;
     }
 
-    function lengthenDataInJson(rootNode) {
+    function lengthenDataInJson(rootNode, customStr) {
       let baseNode = rootNode;
       if (countPrimaryArrayLength(JSON.stringify(baseNode)) <= 0) {
         baseNode = expandArraysInJson(baseNode, 5);
       }
+      const userLongText =
+        typeof customStr === 'string' && customStr.trim()
+          ? customStr.trim()
+          : (longTextInput && longTextInput.value.trim()) || '';
       const SKIP_KEY_RE =
         /^(id|.*Id|.*_id|key|uuid|code|status|state|type|flag|sex|gender|level|sort|order|page|pageNum|pageSize|size|current|total|totalCount|totalElements|recordsTotal|is.*|has.*|enable.*|url|path|href|src|icon|avatar|img|image|color|token|sign)$/i;
 
@@ -1676,8 +1686,12 @@
             ) {
               return;
             }
-            const cleanOrig = val.replace(/^【超长测试】/, '').slice(0, 12) || k;
-            curr[k] = `【超长测试】${cleanOrig}_用于检测前端表格列宽与容器省略号是否溢出的极限超长文本_LONG_TEXT_999999999999`;
+            if (userLongText) {
+              curr[k] = userLongText;
+            } else {
+              const cleanOrig = val.replace(/^【超长测试】/, '').slice(0, 12) || k;
+              curr[k] = `【超长测试】${cleanOrig}_用于检测前端表格列宽与容器省略号是否溢出的极限超长文本_LONG_TEXT_999999999999`;
+            }
           } else if (typeof val === 'number') {
             curr[k] = Number.isInteger(val) ? 99999999 : 99999999.88;
           } else if (val && typeof val === 'object') {
@@ -1705,7 +1719,8 @@
       longBtn.addEventListener('click', () => {
         try {
           const parsed = JSON.parse(textarea.value);
-          const lengthened = lengthenDataInJson(parsed);
+          const customStr = longTextInput ? longTextInput.value.trim() : '';
+          const lengthened = lengthenDataInJson(parsed, customStr);
           syncModalEditorAndTree(JSON.stringify(lengthened, null, 2));
         } catch (e) {
           alert('JSON 语法错误，请检查引号或逗号：' + e.message);
@@ -1732,6 +1747,12 @@
       }
     }
 
+    if (addManyBtn) {
+      addManyBtn.addEventListener('click', () => {
+        const count = Math.max(1, Math.min(2000, parseInt((manyCountInput && manyCountInput.value) || '50', 10) || 50));
+        addRowsInModal(count);
+      });
+    }
     add1Btn.addEventListener('click', () => addRowsInModal(1));
     add5Btn.addEventListener('click', () => addRowsInModal(5));
     add10Btn.addEventListener('click', () => addRowsInModal(10));

@@ -1014,27 +1014,35 @@
           <span style="font-size:11.5px;color:var(--text-sub);font-weight:600;white-space:nowrap;">
             当前页接口 (<span id="activeViewCount" style="color:var(--primary);font-weight:700;">0</span>)
           </span>
-          <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap;">
             <button
               id="batchLongBtn"
               class="btn btn-sm btn-accent"
-              style="height:24px;padding:0 8px;font-size:11px;"
-              title="按下方指定超长字符将当前页已勾选接口全部设为超长并刷新"
+              style="height:24px;padding:0 7px;font-size:11px;"
+              title="按下方指定超长字符数将当前页已勾选接口全部设为超长并刷新"
             >
               一键超长
             </button>
             <button
               id="batchManyBtn"
               class="btn btn-sm btn-accent"
-              style="height:24px;padding:0 8px;font-size:11px;"
+              style="height:24px;padding:0 7px;font-size:11px;"
               title="按下方指定条数将当前页已勾选接口全部生成超多条数据并刷新"
             >
               一键超多
             </button>
             <button
+              id="batchLongManyBtn"
+              class="btn btn-sm btn-accent"
+              style="height:24px;padding:0 7px;font-size:11px;"
+              title="同时按下方指定条数扩充超多条，并将每条文本扩充至指定超长字符数"
+            >
+              一键超长+超多
+            </button>
+            <button
               id="batchEmptyBtn"
               class="btn btn-sm btn-warn"
-              style="height:24px;padding:0 8px;font-size:11px;"
+              style="height:24px;padding:0 7px;font-size:11px;"
               title="将已勾选的当前页接口全部置为空数组 [] 并刷新"
             >
               一键空数据
@@ -1121,6 +1129,7 @@
           style="width:56px;height:26px;padding:0 5px;border:1px solid var(--border-light);border-radius:4px;font-size:11.5px;background:var(--bg-subtle);color:var(--text-main);outline:none;text-align:center;"
         />
         <button id="addCustomCountBtn" class="btn btn-sm btn-accent" style="height:26px;padding:0 8px;">+超多条</button>
+        <button id="detailLongManyBtn" class="btn btn-sm btn-accent" style="height:26px;padding:0 8px;" title="同时按指定条数扩充并按指定字符数设为超长">超长+超多</button>
       </div>
     </div>
 

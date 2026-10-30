@@ -723,6 +723,7 @@
               <span class="qm-label">超多条数:</span>
               <input id="qmManyCountInput" class="qm-input" type="number" min="1" max="2000" value="50" style="width:52px;height:26px;font-size:11px;padding:0 4px;text-align:center;" title="指定超多数据的扩充条数" />
               <button id="qmAddManyBtn" class="qm-btn qm-btn-warn" title="按左侧输入的条数一键扩充超多数据">+超多条</button>
+              <button id="qmLongManyBtn" class="qm-btn qm-btn-warn" title="同时按指定条数扩充超多数据并将文本扩充到指定超长字数">超长+超多</button>
               <button id="qmAdd1Btn" class="qm-btn qm-btn-soft">+1 条</button>
               <button id="qmAdd5Btn" class="qm-btn qm-btn-soft">+5 条</button>
               <button id="qmAdd10Btn" class="qm-btn qm-btn-soft">+10 条</button>
@@ -1480,6 +1481,7 @@
     const longBtn = shadowRoot.getElementById('qmLongBtn');
     const manyCountInput = shadowRoot.getElementById('qmManyCountInput');
     const addManyBtn = shadowRoot.getElementById('qmAddManyBtn');
+    const longManyBtn = shadowRoot.getElementById('qmLongManyBtn');
     const add1Btn = shadowRoot.getElementById('qmAdd1Btn');
     const add5Btn = shadowRoot.getElementById('qmAdd5Btn');
     const add10Btn = shadowRoot.getElementById('qmAdd10Btn');
@@ -1765,6 +1767,29 @@
       addManyBtn.addEventListener('click', () => {
         const count = Math.max(1, Math.min(2000, parseInt((manyCountInput && manyCountInput.value) || '50', 10) || 50));
         addRowsInModal(count);
+      });
+    }
+    if (longManyBtn) {
+      longManyBtn.addEventListener('click', () => {
+        try {
+          let sourceText = textarea.value;
+          if (
+            countPrimaryArrayLength(sourceText) === 0 &&
+            currentEditingReq &&
+            currentEditingReq.originalBody &&
+            countPrimaryArrayLength(currentEditingReq.originalBody) > 0
+          ) {
+            sourceText = currentEditingReq.originalBody;
+          }
+          const parsed = JSON.parse(sourceText);
+          const count = Math.max(1, Math.min(2000, parseInt((manyCountInput && manyCountInput.value) || '50', 10) || 50));
+          const customLen = longTextInput ? longTextInput.value : '100';
+          const expanded = expandArraysInJson(parsed, count);
+          const both = lengthenDataInJson(expanded, customLen);
+          syncModalEditorAndTree(JSON.stringify(both, null, 2));
+        } catch (e) {
+          alert('JSON 语法错误，请检查引号或逗号：' + e.message);
+        }
       });
     }
     add1Btn.addEventListener('click', () => addRowsInModal(1));

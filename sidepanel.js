@@ -324,7 +324,9 @@ const batchManyCountInput = document.getElementById('batchManyCountInput');
 const detailLongTextInput = document.getElementById('detailLongTextInput');
 const detailManyCountInput = document.getElementById('detailManyCountInput');
 const batchManyBtn = document.getElementById('batchManyBtn');
+const batchLongManyBtn = document.getElementById('batchLongManyBtn');
 const addCustomCountBtn = document.getElementById('addCustomCountBtn');
+const detailLongManyBtn = document.getElementById('detailLongManyBtn');
 
 // 初始化并双向同步「超长字符个数」与「超多条数」配置
 (function initCustomStressConfig() {
@@ -609,7 +611,9 @@ function executeBatchTransform(mode) {
           ? lengthenDataInJson(parsed, item)
           : mode === 'many'
             ? expandArraysInJson(parsed, manyCount, item)
-            : emptyArraysInJson(parsed);
+            : mode === 'long_many'
+              ? lengthenDataInJson(expandArraysInJson(parsed, manyCount, item), item)
+              : emptyArraysInJson(parsed);
       const mockBody = JSON.stringify(transformed, null, 2);
       const matchKey = savedRule ? savedRule.matchKey : getDefaultMatchKey(item.url);
 
@@ -636,7 +640,9 @@ function executeBatchTransform(mode) {
         ? `已将当前页 ${changedCount} 个接口扩充至 ${longLen} 个字符并刷新`
         : mode === 'many'
           ? `已为当前页 ${changedCount} 个接口生成 +${manyCount} 条超多数据并刷新`
-          : `已将当前页 ${changedCount} 个接口置空并刷新`
+          : mode === 'long_many'
+            ? `已为当前页 ${changedCount} 个接口生成 +${manyCount} 条且每条 ${longLen} 字超长数据并刷新`
+            : `已将当前页 ${changedCount} 个接口置空并刷新`
     );
     renderList();
     reloadActiveTab();
@@ -648,6 +654,9 @@ if (batchLongBtn) {
 }
 if (batchManyBtn) {
   batchManyBtn.addEventListener('click', () => executeBatchTransform('many'));
+}
+if (batchLongManyBtn) {
+  batchLongManyBtn.addEventListener('click', () => executeBatchTransform('long_many'));
 }
 if (batchEmptyBtn) {
   batchEmptyBtn.addEventListener('click', () => executeBatchTransform('empty'));
@@ -1237,6 +1246,30 @@ add5Btn.addEventListener('click', () => handleAddRows(5));
 add10Btn.addEventListener('click', () => handleAddRows(10));
 if (addCustomCountBtn) {
   addCustomCountBtn.addEventListener('click', () => handleAddRows(getCustomManyCount()));
+}
+if (detailLongManyBtn) {
+  detailLongManyBtn.addEventListener('click', () => {
+    try {
+      let sourceText = jsonEditor.value;
+      if (
+        countPrimaryArrayLength(sourceText) === 0 &&
+        selectedReq &&
+        selectedReq.originalBody &&
+        countPrimaryArrayLength(selectedReq.originalBody) > 0
+      ) {
+        sourceText = selectedReq.originalBody;
+      }
+      const parsed = JSON.parse(sourceText);
+      const manyCount = getCustomManyCount();
+      const longLen = getCustomLongLength();
+      const expanded = expandArraysInJson(parsed, manyCount, selectedReq);
+      const both = lengthenDataInJson(expanded, selectedReq, longLen);
+      syncEditorAndTree(JSON.stringify(both, null, 2));
+      showToast(`已扩充 +${manyCount} 条并设为 ${longLen} 字超长，点击下方保存即生效`);
+    } catch (e) {
+      alert('JSON 格式有误，请先检查语法：' + e.message);
+    }
+  });
 }
 jsonEditor.addEventListener('input', updateArrayInfoLabel);
 
